@@ -1,0 +1,34 @@
+[package]
+name = "openproteo-io-py"
+version = "0.1.0"
+description = "Python bindings (PyO3) for openproteo-io: vendor-neutral mass-spec I/O with mzML conversion and Arrow streaming."
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["mass-spectrometry", "mzml", "proteomics", "pyo3"]
+categories = ["science", "encoding", "api-bindings"]
+publish = false
+
+[lib]
+name = "_openproteo_io"
+crate-type = ["cdylib"]
+
+[features]
+default = ["arrow"]
+arrow = ["openproteo-io/arrow", "openproteo-core/arrow", "dep:arrow"]
+
+[dependencies]
+openproteo-core = { workspace = true }
+openproteo-io = { path = "../openproteo-io", features = ["all"] }
+opentfraw = { workspace = true }
+opentimstdf = { workspace = true }
+openwraw = { workspace = true }
+pyo3 = { version = "0.28", features = ["extension-module", "abi3-py39"] }
+numpy = "0.28"
+arrow = { version = "58", features = ["pyarrow"], optional = true }
+
+[lints]
+workspace = true

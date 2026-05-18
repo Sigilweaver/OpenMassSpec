@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/openproteo-io",
     "crates/openproteo-io-cli",
+    "crates/openproteo-io-py",
 ]
 
 [workspace.package]

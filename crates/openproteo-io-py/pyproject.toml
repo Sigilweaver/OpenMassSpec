@@ -1,0 +1,35 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "openproteo-io"
+version = "0.1.0"
+description = "Vendor-neutral mass-spec I/O: Thermo / Bruker / Waters to mzML, with Arrow streaming. Python bindings to the openproteo-io Rust crate."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
+keywords = ["mass-spectrometry", "mzml", "proteomics", "thermo", "bruker", "waters"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = ["numpy>=1.23"]
+
+[project.optional-dependencies]
+arrow = ["pyarrow>=14"]
+test = ["pytest>=7", "numpy>=1.23", "pyarrow>=14"]
+
+[project.urls]
+Repository = "https://github.com/Sigilweaver/OpenProteo"
+
+[tool.maturin]
+module-name = "openproteo_io._openproteo_io"
+python-source = "python"
+features = ["pyo3/extension-module", "arrow"]
+manifest-path = "Cargo.toml"
