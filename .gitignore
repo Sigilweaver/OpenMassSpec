@@ -10,5 +10,8 @@ __pycache__/
 *.pyd
 *.dylib
 
+# mdBook output
+docs/book/
+
 # Working-name reminder, kept out of history
 RENAME-TBD.md
