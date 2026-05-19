@@ -241,6 +241,7 @@ pub fn collect(
     detected: Detected,
 ) -> Result<(Vec<openproteo_core::SpectrumRecord>, openproteo_core::RunMetadata)>
 {
+    #[allow(unused_imports)]
     use openproteo_core::SpectrumSource;
     match detected.format {
         VendorFormat::ThermoRaw => {

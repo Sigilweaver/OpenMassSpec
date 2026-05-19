@@ -31,3 +31,16 @@ All notable changes to this project will be documented in this file.
   to mzML when present, skipping silently otherwise.
 - `RENAME-TBD.md` flagging this as the working name pending the final
   decision (candidate: `OpenProteo`).
+
+### Fixed
+
+- Silenced unused-import warning for `openproteo_core::SpectrumSource`
+  inside `openproteo_io::collect()` when no vendor features are
+  enabled.
+
+### Notes
+
+- STRATEGY P0 #1 (route ProLance through `openproteo-io`) marked DONE.
+  Shipped in ProLance `develop` commits `aece8f6` (single vendor
+  ingester via `openproteo_io::collect`) and `708dbc3` (mzML writer
+  delegates to `openproteo-core`).

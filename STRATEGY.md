@@ -157,12 +157,16 @@ work package.
 
 ### P0 - Critical correctness / unblock
 
-1. **Route ProLance through `openproteo-io`.** Replace the per-vendor adapter modules
-   with a single ingester that takes `&mut dyn SpectrumSource`. Delete
-   `prolance-ms/src/{thermo,bruker,waters}.rs` and the bespoke
-   `prolance-ms/src/mzml.rs`. Pull metadata + records from `openproteo_io::collect`.
-   This unblocks Waters ingest immediately (vendor2mzml already handles it) and
-   removes the schema-drift surface. Estimated: medium.
+1. **Route ProLance through `openproteo-io`.** [DONE] Shipped in ProLance
+   `develop` commits `aece8f6 feat(prolance): route vendor ingest through
+   openproteo-io` and `708dbc3 refactor(prolance): delegate mzML emission to
+   openproteo-core`. Per-vendor `prolance-ms/src/{thermo,bruker,waters}.rs`
+   removed; a single ingester (`prolance-ms/src/vendor.rs`) consumes
+   `openproteo_io::collect`. mzML writer delegates to `openproteo-core`. No
+   direct `opentfraw|opentimstdf|openwraw` imports remain in ProLance. The
+   surviving `prolance-ms/src/mzml/reader.rs` is the verbatim-roundtrip
+   reader (prefix/inter/suffix preservation) - intentionally kept local to
+   ProLance. Waters ingest is unblocked.
 
 2. **OpenProteoCore visibility.** [DONE] Expanded `README.md` to 150+
    lines (install, quick example, API reference table, conformance,
