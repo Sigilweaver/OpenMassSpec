@@ -10,7 +10,14 @@ readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.9"
 authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
-keywords = ["mass-spectrometry", "mzml", "proteomics", "thermo", "bruker", "waters"]
+keywords = [
+    "mass-spectrometry",
+    "mzml",
+    "proteomics",
+    "thermo",
+    "bruker",
+    "waters",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",

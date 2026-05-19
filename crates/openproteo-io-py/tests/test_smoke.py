@@ -10,13 +10,11 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
-import pytest
-
 import openproteo_io as opio
+import pytest
 
 
 def _corpus(envvar: str) -> Path | None:

@@ -5,11 +5,11 @@ or stream spectra as zero-copy NumPy arrays / pyarrow record batches.
 """
 
 from ._openproteo_io import (
+    Spectrum,
     __version__,
     detect,
-    to_mzml,
     iter_spectra,
-    Spectrum,
+    to_mzml,
 )
 
 try:
