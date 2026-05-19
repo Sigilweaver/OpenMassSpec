@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Typed `openproteo_io::Error` enum with `thiserror`-based variants
+  (`UnsupportedFormat`, `FeatureDisabled`, `Io`, `Core`, feature-gated
+  `Thermo`/`Bruker`/`Waters`, `Mzml`). Replaces `Box<dyn Error>` in
+  `convert_to_mzml`, `convert_to_mzml_writer`, `collect`, and internal
+  helpers. `openproteo-io-cli::mzml_reader` and `openproteo-io-py`'s
+  internal helpers now use the same `openproteo_io::Result` alias.
 - Coordinated stack release scheme. `scripts/release-stack.sh` reads
   pinned versions across the five-repo stack, aggregates per-repo
   `CHANGELOG.md` entries into combined release notes, and can create +

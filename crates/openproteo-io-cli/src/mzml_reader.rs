@@ -26,8 +26,9 @@ pub fn looks_like_mzml(path: &Path) -> bool {
 }
 
 /// Decode an mzML (or mzML.gz) file into a vector of `SpectrumRecord`s.
-pub fn read_mzml_records(path: &Path) -> Result<Vec<SpectrumRecord>, String> {
-    let reader = MzMLReader::open_path(path).map_err(|e| e.to_string())?;
+pub fn read_mzml_records(path: &Path) -> openproteo_io::Result<Vec<SpectrumRecord>> {
+    let reader = MzMLReader::open_path(path)
+        .map_err(|e| openproteo_io::Error::Mzml(e.to_string()))?;
     let mut out = Vec::new();
     for (i, spectrum) in reader.enumerate() {
         let raw: RawSpectrum = spectrum.into();

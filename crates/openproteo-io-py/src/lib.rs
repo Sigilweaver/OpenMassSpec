@@ -50,8 +50,7 @@ fn detected_or_err(path: &Path) -> PyResult<Detected> {
 /// variant is on the roadmap.
 fn collect_records(
     detected: &Detected,
-) -> Result<(Vec<SpectrumRecord>, openproteo_core::RunMetadata), Box<dyn std::error::Error + Send + Sync>>
-{
+) -> openproteo_io::Result<(Vec<SpectrumRecord>, openproteo_core::RunMetadata)> {
     match detected.format {
         VendorFormat::ThermoRaw => collect_thermo(&detected.path),
         VendorFormat::BrukerTdf => {
@@ -71,8 +70,7 @@ fn collect_records(
 
 fn collect_thermo(
     path: &Path,
-) -> Result<(Vec<SpectrumRecord>, openproteo_core::RunMetadata), Box<dyn std::error::Error + Send + Sync>>
-{
+) -> openproteo_io::Result<(Vec<SpectrumRecord>, openproteo_core::RunMetadata)> {
     use std::fs::File;
     use std::io::BufReader;
     let raw = opentfraw::RawFileReader::open_path(path)?;

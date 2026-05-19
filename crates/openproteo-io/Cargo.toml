@@ -24,6 +24,7 @@ openproteo-core = { workspace = true }
 opentfraw = { workspace = true, optional = true }
 opentimstdf = { workspace = true, optional = true }
 openwraw = { workspace = true, optional = true }
+thiserror = "2"
 
 [lints]
 workspace = true

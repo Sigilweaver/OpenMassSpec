@@ -203,9 +203,14 @@ work package.
 
 ### P2 - Quality / consistency
 
-6. **Standardize error handling.** Migrate OpenWRaw to `thiserror` to match the other
-   vendor crates. Optionally publish an `openproteo-error` aggregate enum used by the
-   umbrella and ProLance so downstream `?`-propagation is uniform. Estimated: small.
+6. **Standardize error handling.** [DONE] All four vendor crates
+   (`openproteo-core`, `opentfraw`, `opentimstdf`, `openwraw`) already use
+   `thiserror = 2` with public `Error` enums. The umbrella was the real
+   outlier and now exposes `openproteo_io::Error` (`UnsupportedFormat`,
+   `FeatureDisabled`, `Io`, `Core`, feature-gated `Thermo`/`Bruker`/`Waters`,
+   `Mzml`) with `#[from]` conversions, replacing `Box<dyn Error>` and
+   `Result<_, String>` across `openproteo-io`, `openproteo-io-cli::mzml_reader`,
+   and `openproteo-io-py`'s internal helpers.
 
 7. **Conformance suite as a binary.** [DONE] `vendor2mzml validate <input>`
    accepts any vendor input plus `.mzML` / `.mzML.gz` (via `mzdata`) and runs

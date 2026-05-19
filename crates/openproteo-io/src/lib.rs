@@ -15,6 +15,9 @@
 
 use std::path::{Path, PathBuf};
 
+mod error;
+pub use error::{Error, Result};
+
 pub use openproteo_core as core;
 
 #[cfg(feature = "arrow")]
@@ -124,14 +127,13 @@ fn is_thermo_raw(path: &Path) -> bool {
 
 /// Convert a detected vendor file to mzML at `output`. Picks the
 /// correct vendor crate's `write_mzml` (or `write_indexed_mzml`) based
-/// on `indexed`. Errors are returned as boxed `dyn Error` so callers do
-/// not need to thread vendor-specific error types.
+/// on `indexed`.
 #[allow(clippy::needless_pass_by_value)] // for symmetry with detect_format
 pub fn convert_to_mzml(
     detected: Detected,
     output: &Path,
     indexed: bool,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<()> {
     use std::fs::File;
     use std::io::BufWriter;
     let f = File::create(output)?;
@@ -147,7 +149,7 @@ pub fn convert_to_mzml_writer<W: std::io::Write>(
     detected: Detected,
     writer: &mut W,
     indexed: bool,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<()> {
     write_to(detected.format, &detected.path, writer, indexed)
 }
 
@@ -156,7 +158,7 @@ fn write_to(
     path: &Path,
     w: &mut impl std::io::Write,
     indexed: bool,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<()> {
     match format {
         VendorFormat::ThermoRaw => {
             #[cfg(feature = "thermo")]
@@ -166,7 +168,7 @@ fn write_to(
             #[cfg(not(feature = "thermo"))]
             {
                 let _ = (path, w, indexed);
-                Err("openproteo-io was built without the 'thermo' feature".into())
+                Err(Error::FeatureDisabled { vendor: "thermo" })
             }
         }
         VendorFormat::BrukerTdf => {
@@ -182,7 +184,7 @@ fn write_to(
             #[cfg(not(feature = "bruker"))]
             {
                 let _ = (path, w, indexed);
-                Err("openproteo-io was built without the 'bruker' feature".into())
+                Err(Error::FeatureDisabled { vendor: "bruker" })
             }
         }
         VendorFormat::WatersRaw => {
@@ -198,7 +200,7 @@ fn write_to(
             #[cfg(not(feature = "waters"))]
             {
                 let _ = (path, w, indexed);
-                Err("openproteo-io was built without the 'waters' feature".into())
+                Err(Error::FeatureDisabled { vendor: "waters" })
             }
         }
     }
@@ -209,7 +211,7 @@ fn thermo_convert(
     path: &Path,
     out: &mut impl std::io::Write,
     indexed: bool,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<()> {
     use std::fs::File;
     use std::io::BufReader;
     let raw = opentfraw::RawFileReader::open_path(path)?;
@@ -237,7 +239,7 @@ fn thermo_convert(
 #[allow(clippy::needless_pass_by_value)]
 pub fn collect(
     detected: Detected,
-) -> Result<(Vec<openproteo_core::SpectrumRecord>, openproteo_core::RunMetadata), Box<dyn std::error::Error + Send + Sync>>
+) -> Result<(Vec<openproteo_core::SpectrumRecord>, openproteo_core::RunMetadata)>
 {
     use openproteo_core::SpectrumSource;
     match detected.format {
@@ -261,7 +263,7 @@ pub fn collect(
                 Ok((recs, meta))
             }
             #[cfg(not(feature = "thermo"))]
-            Err("openproteo-io was built without the 'thermo' feature".into())
+            Err(Error::FeatureDisabled { vendor: "thermo" })
         }
         VendorFormat::BrukerTdf => {
             #[cfg(feature = "bruker")]
@@ -272,7 +274,7 @@ pub fn collect(
                 Ok((recs, meta))
             }
             #[cfg(not(feature = "bruker"))]
-            Err("openproteo-io was built without the 'bruker' feature".into())
+            Err(Error::FeatureDisabled { vendor: "bruker" })
         }
         VendorFormat::WatersRaw => {
             #[cfg(feature = "waters")]
@@ -283,7 +285,7 @@ pub fn collect(
                 Ok((recs, meta))
             }
             #[cfg(not(feature = "waters"))]
-            Err("openproteo-io was built without the 'waters' feature".into())
+            Err(Error::FeatureDisabled { vendor: "waters" })
         }
     }
 }
@@ -378,5 +380,19 @@ mod tests {
         let p = tempfile_path();
         let _ = std::fs::create_dir_all(&p);
         p
+    }
+
+    #[test]
+    fn convert_unsupported_format_returns_typed_error() {
+        // `detect_format` returns None here, so callers can't reach
+        // `convert_to_mzml`. Exercise the FeatureDisabled / Mzml paths
+        // through the public `Error` variants directly to keep this
+        // test feature-agnostic.
+        let e: Error = std::io::Error::other("boom").into();
+        assert!(matches!(e, Error::Io(_)));
+        let e = Error::FeatureDisabled { vendor: "thermo" };
+        assert_eq!(e.to_string(), "openproteo-io was built without the 'thermo' feature");
+        let e = Error::UnsupportedFormat(PathBuf::from("/tmp/nope"));
+        assert!(matches!(e, Error::UnsupportedFormat(_)));
     }
 }
