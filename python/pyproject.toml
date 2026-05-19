@@ -1,38 +1,48 @@
 [build-system]
-requires      = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name        = "openproteo"
-version     = "0.1.0"
+name = "openproteo"
+version = "0.2.0"
 description = "Open proteomics: one install for the OpenProteo vendor reader stack (Thermo, Bruker, Waters)"
-readme      = "README.md"
-license     = { text = "Apache-2.0" }
-authors     = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
 requires-python = ">=3.9"
-keywords        = ["mass-spectrometry", "proteomics", "raw", "thermo", "bruker", "waters", "tdf", "mzml"]
-classifiers     = [
+keywords = [
+    "mass-spectrometry",
+    "proteomics",
+    "raw",
+    "thermo",
+    "bruker",
+    "waters",
+    "tdf",
+    "mzml",
+]
+classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Rust",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
-dependencies = []
+dependencies = ["openproteo-io"]
 
 [project.optional-dependencies]
-# Each extra pulls in one vendor reader. Users can pick what they need; the
-# `all` extra installs every supported vendor.
+# The base install always brings openproteo-io (the vendor-agnostic Rust
+# reader). Each extra layers on a per-vendor native binding; the `all`
+# extra installs every supported vendor.
 thermo = ["opentfraw"]
 bruker = ["opentimstdf"]
 waters = ["openwraw"]
-all    = ["opentfraw", "opentimstdf", "openwraw"]
+all = ["opentfraw", "opentimstdf", "openwraw"]
 
 [project.urls]
-Homepage      = "https://github.com/Sigilweaver/OpenProteo"
+Homepage = "https://github.com/Sigilweaver/OpenProteo"
 Documentation = "https://github.com/Sigilweaver/OpenProteo"
-Source        = "https://github.com/Sigilweaver/OpenProteo"
-Issues        = "https://github.com/Sigilweaver/OpenProteo/issues"
+Source = "https://github.com/Sigilweaver/OpenProteo"
+Issues = "https://github.com/Sigilweaver/OpenProteo/issues"
 
 [tool.setuptools]
 packages = ["openproteo"]

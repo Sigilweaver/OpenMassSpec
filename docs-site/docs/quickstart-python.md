@@ -1,5 +1,23 @@
 # Quickstart: Python
 
+## Install
+
+The `openproteo` metapackage is the single pip install surface for the
+stack. The base install brings the vendor-agnostic reader
+(`openproteo-io`); each per-vendor extra layers on a native binding for
+direct vendor access.
+
+```sh
+pip install openproteo            # openproteo_io reader
+pip install openproteo[thermo]    # + opentfraw
+pip install openproteo[bruker]    # + opentimstdf
+pip install openproteo[waters]    # + openwraw
+pip install openproteo[all]       # all vendor extensions
+```
+
+You can also install `openproteo-io` directly if you only want the
+unified reader without the metapackage shim:
+
 ```sh
 pip install 'openproteo-io[arrow]'
 ```
@@ -7,13 +25,34 @@ pip install 'openproteo-io[arrow]'
 ## Detect and convert
 
 ```python
-import openproteo_io as op
+import openproteo as op
 
 det = op.detect_format("sample.raw")
 print(det.vendor, det.path)        # 'thermo' /path/to/sample.raw
 
 op.to_mzml("sample.raw", "sample.mzML", indexed=True)
 ```
+
+The functions `detect_format`, `to_mzml`, `iter_spectra`, and the
+`Spectrum` class are re-exported from `openproteo_io`. You can also
+import them from `openproteo_io` directly; the two paths refer to the
+same objects.
+
+## Vendor dispatch
+
+For code paths that prefer the native vendor bindings (because they
+expose vendor-specific surfaces beyond mzML / Arrow), the metapackage
+ships a structural format detector and a dispatcher:
+
+```python
+import openproteo as op
+
+kind = op.detect("sample.raw")     # 'thermo' / 'bruker' / 'waters' / None
+reader = op.open_run("sample.raw") # opentfraw.RawFile / opentimstdf.Reader / ...
+```
+
+`open_run` requires the matching extra to be installed; otherwise it
+raises `ImportError`.
 
 ## Iterate spectra (numpy)
 

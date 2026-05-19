@@ -183,12 +183,15 @@ work package.
    (Core 0.1, vendor crates 1.0.x, Umbrella 0.1, ProLance once it lands). Estimated:
    small.
 
-5. **Unified Python distribution.** Decide between (a) `openproteo` metapackage that
-   re-exports `openwraw` / `opentfraw` / `opentimstdf` / `openproteo_io`, or
-   (b) collapse all four into a single maturin build under `openproteo-io-py` that
-   feature-gates each vendor. (a) is the lower-risk move; (b) is cleaner long-term.
-   Recommend (a) now and (b) when v1.0 of the umbrella lands. Estimated: small (a) /
-   large (b).
+5. **Unified Python distribution.** [DONE - variant (a)] `pip install openproteo`
+   ships the metapackage at `python/openproteo` (v0.2.0). Base install
+   depends on `openproteo-io`; extras `[thermo]` / `[bruker]` / `[waters]`
+   / `[all]` layer on `opentfraw` / `opentimstdf` / `openwraw`. Re-exports
+   `detect_format`, `to_mzml`, `iter_spectra`, `Spectrum` from
+   `openproteo_io`; adds structural `detect()` + `open_run()` dispatcher
+   for the native vendor bindings. CI builds and tests it; the release
+   workflow attaches the metapackage sdist. Variant (b) (single maturin
+   build with feature-gated vendors) remains as a future option.
 
 ### P2 - Quality / consistency
 

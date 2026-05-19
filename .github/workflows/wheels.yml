@@ -113,9 +113,29 @@ jobs:
           name: openproteo-io-sdist
           path: OpenProteo/crates/openproteo-io-py/dist/*.tar.gz
 
+  metapackage-sdist:
+    name: Metapackage sdist (openproteo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: OpenProteo
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build
+        run: pip install build
+      - name: Build sdist
+        working-directory: OpenProteo/python
+        run: python -m build --sdist --outdir dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openproteo-metapackage-sdist
+          path: OpenProteo/python/dist/*.tar.gz
+
   collect:
     name: Collect for release
-    needs: [wheels, sdist]
+    needs: [wheels, sdist, metapackage-sdist]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:

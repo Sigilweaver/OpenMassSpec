@@ -173,8 +173,16 @@ jobs:
       - name: Build and install openproteo-io
         working-directory: OpenProteo/crates/openproteo-io-py
         run: maturin develop --release --features pyo3/extension-module
+      - name: Install openproteo metapackage
+        working-directory: OpenProteo
+        run: pip install ./python
       - name: Import smoke test
         run: python -c "import openproteo_io; print(openproteo_io.__version__ if hasattr(openproteo_io, '__version__') else 'ok')"
+      - name: Metapackage import smoke
+        run: python -c "import openproteo; print(openproteo.__version__); assert callable(openproteo.to_mzml)"
+      - name: Metapackage tests
+        working-directory: OpenProteo
+        run: pytest python/tests -v
 
   docs:
     name: Docs (Docusaurus)
