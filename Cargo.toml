@@ -14,10 +14,10 @@ license = "Apache-2.0"
 repository = "https://github.com/Sigilweaver/OpenProteo"
 
 [workspace.dependencies]
-openproteo-core = { path = "../OpenProteoCore", version = "0.1.0" }
-opentfraw = { path = "../OpenTFRaw/crates/opentfraw", version = "1.0.5" }
-opentimstdf = { path = "../OpenTDF/crates/opentimstdf", version = "1.0.5" }
-openwraw = { path = "../OpenWRaw/crates/openwraw", version = "1.0.4" }
+openproteo-core = "0.1.0"
+opentfraw = "1.0.5"
+opentimstdf = "1.0.5"
+openwraw = "1.0.4"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
