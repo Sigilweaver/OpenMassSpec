@@ -1,8 +1,16 @@
-# Publish openproteo-io to crates.io on tag push.
+# Publish the OpenProteo stack to crates.io and PyPI on tag push.
 #
-# Only the library crate (`openproteo-io`) is published. The CLI
-# (`openproteo-io-cli` / `vendor2mzml`) ships from binary release
-# artifacts only and is intentionally not on crates.io.
+# - `openproteo-io` (Rust library) -> crates.io
+# - `openproteo-io` (Python wheel via maturin matrix) -> PyPI
+# - `openproteo` (pure-Python metapackage) -> PyPI
+#
+# Wheel and sdist uploads use PyPI trusted publishing (OIDC); no PyPI
+# tokens live in this repo. The `openproteo` and `openproteo-io`
+# trusted publishers must be configured on PyPI to allow uploads from
+# this workflow (Sigilweaver/OpenProteo, workflow `publish.yml`).
+#
+# The CLI (`openproteo-io-cli` / `vendor2mzml`) ships only as binary
+# release artifacts and is intentionally not on crates.io or PyPI.
 #
 # Requires repository secret CARGO_REGISTRY_TOKEN with publish access
 # to the `openproteo-io` crate.
@@ -30,3 +38,111 @@ jobs:
       - run: cargo publish -p openproteo-io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  build-wheels:
+    name: Build wheels (${{ matrix.os }} / ${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64
+          - os: ubuntu-latest
+            target: aarch64
+          - os: macos-latest
+            target: x86_64
+          - os: macos-latest
+            target: aarch64
+          - os: windows-latest
+            target: x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --find-interpreter --manifest-path crates/openproteo-io-py/Cargo.toml
+          sccache: "true"
+          manylinux: auto
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: dist
+
+  build-sdist:
+    name: Build openproteo-io sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist --manifest-path crates/openproteo-io-py/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist-openproteo-io
+          path: dist
+
+  build-metapackage:
+    name: Build openproteo metapackage (sdist + wheel)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build --sdist --wheel --outdir dist python/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-openproteo
+          path: dist
+
+  publish-openproteo-io:
+    name: Publish openproteo-io to PyPI
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/openproteo-io
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist-openproteo-io
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true
+
+  publish-openproteo:
+    name: Publish openproteo metapackage to PyPI
+    needs: [build-metapackage]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/openproteo
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-openproteo
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true

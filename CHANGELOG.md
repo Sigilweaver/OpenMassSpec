@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file.
 
 - _No unreleased changes yet._
 
+## [1.0.2] - 2026-05-22
+
+Test + packaging release. No runtime behaviour changes; the umbrella
+crates, the Python metapackage, and the `openproteo-io` Python wheel
+are now publishable from a single tag, and the `openproteo`
+metapackage drift bug is fixed.
+
+### Added
+
+- PyPI publish wiring in `.github/workflows/publish.yml`:
+  - maturin wheel matrix (linux x86_64/aarch64, macos x86_64/aarch64,
+    windows x86_64) + sdist for `openproteo-io`,
+  - pure-Python sdist + wheel build for the `openproteo` metapackage,
+  - PyPI uploads gated on the `pypi` GitHub environment via OIDC
+    trusted publishing (no API tokens in the repo).
+- Expanded `python/tests/test_metapackage.py`: dispatch tests for
+  `open_run()` (thermo / bruker / waters with monkeypatched vendor
+  modules), `__version__` vs installed-metadata drift check,
+  immutable-`VENDORS` and full `__all__` surface check.
+
+### Changed
+
+- `openproteo.__version__` now derives from
+  `importlib.metadata.version("openproteo")` rather than a hard-coded
+  literal. This fixes the silent `0.2.0` vs `1.0.x` drift the previous
+  literal could produce.
+- Workspace pin: `openproteo-core = 1.0.1` (docs-only patch upstream).
+- `STACK.md` regenerated for the new pin set.
+
+### Removed
+
+- `STRATEGY.md` (internal planning artifact; no longer tracked).
+
 ## [1.0.1] - 2026-05-21
 
 Maintenance release. Pins the stack at `openproteo-core = 1.0.0`,

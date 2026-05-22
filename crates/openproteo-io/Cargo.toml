@@ -1,6 +1,6 @@
 [package]
 name = "openproteo-io"
-version = "1.0.1"
+version = "1.0.2"
 description = "Vendor-neutral mass-spec I/O: feature-gated re-exports of opentfraw / opentimstdf / openwraw with auto-detection and an mzML writer."
 edition.workspace = true
 rust-version.workspace = true

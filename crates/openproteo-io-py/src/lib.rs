@@ -298,8 +298,8 @@ fn iter_spectra(py: Python<'_>, path: PathBuf) -> PyResult<Py<SpectrumIter>> {
 #[cfg(feature = "arrow")]
 mod arrow_bridge {
     use super::*;
-    use ::arrow::pyarrow::ToPyArrow;
-    use ::arrow::record_batch::RecordBatch;
+    use arrow::pyarrow::ToPyArrow;
+    use arrow::record_batch::RecordBatch;
     use openproteo_core::arrow::SpectrumBatchBuilder;
 
     /// Build a `pyarrow.RecordBatchReader` over every spectrum in the

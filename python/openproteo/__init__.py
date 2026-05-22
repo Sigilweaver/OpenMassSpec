@@ -29,10 +29,14 @@ Top-level helpers fall into two layers:
 from __future__ import annotations
 
 import os
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Optional
 
-__version__ = "0.2.0"
+try:
+    __version__ = _pkg_version("openproteo")
+except PackageNotFoundError:  # pragma: no cover - source checkout fallback
+    __version__ = "0.0.0+unknown"
 
 # Re-export the openproteo_io reader surface so callers can write
 # ``from openproteo import to_mzml, iter_spectra, detect_format``.
