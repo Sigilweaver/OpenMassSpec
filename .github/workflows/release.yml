@@ -1,8 +1,9 @@
 # Release binaries for vendor2mzml.
 #
 # Triggered by pushing a tag matching v*. Builds vendor2mzml for the five
-# supported targets and attaches archives to the GitHub release. No
-# crates.io publish (deferred).
+# supported targets, packages archives, and attaches them to the GitHub
+# release. Vendor-crate deps are pulled from crates.io; no multi-repo
+# checkout is required.
 
 name: Release (binaries)
 
@@ -45,24 +46,6 @@ jobs:
             archive: zip
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: OpenProteo
-      - uses: actions/checkout@v4
-        with:
-          repository: Sigilweaver/OpenProteoCore
-          path: OpenProteoCore
-      - uses: actions/checkout@v4
-        with:
-          repository: Sigilweaver/OpenTFRaw
-          path: OpenTFRaw
-      - uses: actions/checkout@v4
-        with:
-          repository: Sigilweaver/OpenTimsTDF
-          path: OpenTDF
-      - uses: actions/checkout@v4
-        with:
-          repository: Sigilweaver/OpenWRaw
-          path: OpenWRaw
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -77,13 +60,11 @@ jobs:
           echo 'CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc' >> "$GITHUB_ENV"
 
       - name: Build vendor2mzml
-        working-directory: OpenProteo
         run: cargo build --release -p openproteo-io-cli --target ${{ matrix.target }}
 
       - name: Package archive (unix)
         if: matrix.archive == 'tar.gz'
         shell: bash
-        working-directory: OpenProteo
         run: |
           NAME=vendor2mzml-${{ github.ref_name }}-${{ matrix.label }}
           mkdir -p dist/$NAME
@@ -95,7 +76,6 @@ jobs:
       - name: Package archive (windows)
         if: matrix.archive == 'zip'
         shell: pwsh
-        working-directory: OpenProteo
         run: |
           $name = "vendor2mzml-${{ github.ref_name }}-${{ matrix.label }}"
           New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
@@ -110,7 +90,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vendor2mzml-${{ matrix.label }}
-          path: OpenProteo/dist/vendor2mzml-*
+          path: dist/vendor2mzml-*
 
   release:
     name: Attach to GitHub Release

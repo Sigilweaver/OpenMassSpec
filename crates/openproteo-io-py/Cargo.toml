@@ -1,6 +1,6 @@
 [package]
 name = "openproteo-io-py"
-version = "1.0.2"
+version = "1.0.3"
 description = "Python bindings (PyO3) for openproteo-io: vendor-neutral mass-spec I/O with mzML conversion and Arrow streaming."
 edition.workspace = true
 rust-version.workspace = true

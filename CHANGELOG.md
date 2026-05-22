@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file.
 
 - _No unreleased changes yet._
 
+## [1.0.3] - 2026-05-22
+
+CI / workflow correctness release. No runtime behaviour changes.
+
+### Changed
+
+- Workspace MSRV raised from `1.85` to `1.87` to correctly declare the
+  minimum Rust version required by `mzdata 0.63.x` (`slice_as_chunks`
+  was stabilised in Rust 1.87.0). The `1.85` declaration shipped in
+  `1.0.2` was incorrect.
+- `release.yml`: removed stale multi-repo checkout steps that were
+  left over from the path-dependency era. All vendor-crate deps resolve
+  from crates.io so only the umbrella repo needs to be checked out.
+- `wheels.yml` deleted; the wheel build and PyPI publish are now
+  handled entirely by `publish.yml`.
+- CI `MSRV check` updated from `1.85` to `1.87` to match.
+
 ## [1.0.2] - 2026-05-22
 
 Test + packaging release. No runtime behaviour changes; the umbrella
@@ -33,6 +50,9 @@ metapackage drift bug is fixed.
   literal. This fixes the silent `0.2.0` vs `1.0.x` drift the previous
   literal could produce.
 - Workspace pin: `openproteo-core = 1.0.1` (docs-only patch upstream).
+- Workspace MSRV raised from `1.85` to `1.87`. `mzdata 0.63.x` uses
+  `slice_as_chunks`, which was stabilised in Rust 1.87.0 (May 2025).
+  The previous MSRV was chosen for `arrow-58.x`; 1.87 supersedes that.
 - `STACK.md` regenerated for the new pin set.
 
 ### Removed

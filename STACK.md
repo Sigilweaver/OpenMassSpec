@@ -7,7 +7,7 @@ Current pinned versions across the OpenProteo stack. Regenerate with
 
 | Component | Version |
 |-----------|---------|
-| OpenProteo (umbrella) | 1.0.2 |
+| OpenProteo (umbrella) | 1.0.3 |
 | openproteo-core | 1.0.1 |
 | opentfraw | 1.0.6 |
 | opentimstdf | 1.0.6 |
