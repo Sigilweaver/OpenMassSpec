@@ -77,21 +77,13 @@ const config: Config = {
                 },
                 {
                     type: 'dropdown',
-                    label: 'Stack',
+                    label: 'Projects',
                     position: 'left',
                     items: [
-                        {
-                            label: 'OpenWRaw (Waters)',
-                            href: 'https://sigilweaver.app/openwraw/docs/',
-                        },
-                        {
-                            label: 'OpenTFRaw (Thermo)',
-                            href: 'https://sigilweaver.app/opentfraw/docs/',
-                        },
-                        {
-                            label: 'OpenTimsTDF (Bruker)',
-                            href: 'https://sigilweaver.app/opentdf/docs/',
-                        },
+                        { label: 'All Docs', href: 'https://sigilweaver.app/docs/' },
+                        { label: 'OpenTFRaw (Thermo)', href: 'https://sigilweaver.app/opentfraw/docs/' },
+                        { label: 'OpenTimsTDF (Bruker)', href: 'https://sigilweaver.app/opentimstdf/docs/' },
+                        { label: 'OpenWRaw (Waters)', href: 'https://sigilweaver.app/openwraw/docs/' },
                     ],
                 },
                 {
