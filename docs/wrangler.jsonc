@@ -1,0 +1,17 @@
+{
+    "name": "openproteo-docs",
+    "compatibility_date": "2024-11-26",
+    "assets": {
+        "directory": "./build"
+    },
+    "routes": [
+        {
+            "pattern": "sigilweaver.app/openproteo/docs",
+            "zone_name": "sigilweaver.app"
+        },
+        {
+            "pattern": "sigilweaver.app/openproteo/docs/*",
+            "zone_name": "sigilweaver.app"
+        }
+    ]
+}
