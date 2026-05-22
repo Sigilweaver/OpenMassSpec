@@ -3,7 +3,7 @@
 [![CI](https://github.com/Sigilweaver/OpenProteo/actions/workflows/ci.yml/badge.svg)](https://github.com/Sigilweaver/OpenProteo/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/openproteo-io.svg)](https://crates.io/crates/openproteo-io)
 [![PyPI](https://img.shields.io/pypi/v/openproteo.svg)](https://pypi.org/project/openproteo/)
-[![docs](https://img.shields.io/badge/docs-sigilweaver.app-blue)](https://sigilweaver.app/openproteo/)
+[![docs](https://img.shields.io/badge/docs-sigilweaver.app-blue)](https://sigilweaver.app/openproteo/docs/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 
 > **One stack. Three vendors. Open Rust.**
@@ -91,7 +91,7 @@ openproteo.to_mzml("sample.raw", "sample.mzML", indexed=True)
 ## Documentation
 
 Full reference, conversion semantics, and the per-vendor parser notes
-live at [**sigilweaver.app/openproteo**](https://sigilweaver.app/openproteo/).
+live at [**sigilweaver.app/openproteo/docs**](https://sigilweaver.app/openproteo/docs/).
 
 The source for that site is in [`docs/`](docs/) (Docusaurus). See
 [docs/README.md](docs/README.md) for the build commands.
