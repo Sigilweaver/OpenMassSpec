@@ -80,6 +80,11 @@ const config: Config = {
                     ],
                 },
                 {
+                    label: 'Core',
+                    href: 'https://docs.rs/openproteo-core',
+                    position: 'left',
+                },
+                {
                     href: 'https://github.com/Sigilweaver/OpenProteo',
                     label: 'GitHub',
                     position: 'right',
