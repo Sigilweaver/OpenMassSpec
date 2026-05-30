@@ -70,13 +70,13 @@ jobs:
           done
 
   msrv:
-    name: MSRV check (1.87)
+    name: MSRV check (1.88)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.87
+          toolchain: "1.88"
       - uses: Swatinem/rust-cache@v2
       - name: cargo check (MSRV)
         run: cargo check --workspace --all-features
@@ -95,6 +95,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - name: Create venv
+        run: |
+          python -m venv .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
       - name: Install maturin + pytest
         run: pip install 'maturin>=1.5,<2' pytest pyarrow numpy
       - name: Build and install openproteo-io
@@ -123,10 +128,5 @@ jobs:
       - name: Build
         working-directory: docs
         run: bun run build:cloudflare
-      - name: Deploy to Cloudflare Workers
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        working-directory: docs
-        run: bunx wrangler deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Cloudflare deployment is handled by the Cloudflare GitHub App
+      # via push events. No wrangler deploy step is needed here.
