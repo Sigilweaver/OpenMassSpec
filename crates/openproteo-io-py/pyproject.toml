@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "openproteo-io"
-version = "1.0.3"
+version = "1.1.0"
 description = "Vendor-neutral mass-spec I/O: Thermo / Bruker / Waters to mzML, with Arrow streaming. Python bindings to the openproteo-io Rust crate."
 readme = "README.md"
 license = { text = "Apache-2.0" }

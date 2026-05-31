@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file.
 
 - _No unreleased changes yet._
 
+## [1.1.0] - 2026-05-31
+
+### Added
+
+- `CITATION.cff`: author identity (Nathan Riley + ORCID) and a
+  scaffolded `identifiers:` block ready for the Zenodo concept DOI.
+
+### Changed
+
+- Workspace MSRV raised from `1.87` to `1.88` (mzdata uses
+  `slice_as_chunks`).
+- CI: maturin-develop step now provisions a venv before invoking
+  maturin, so wheel builds succeed on Ubuntu runners with PEP 668.
+- Cloudflare Pages deploy moved off the `wrangler` GitHub Action;
+  the Cloudflare GitHub App now handles deploys.
+- Docusaurus navbar adds a Core link to docs.rs/openproteo-core
+  (WP15).
+- Workspace metadata hygiene (WP13): authors, repository, homepage,
+  documentation, readme, keywords, categories declared once under
+  `[workspace.package]` and inherited.
+- README badge block unified across the Sigilweaver portfolio.
+
 ## [1.0.3] - 2026-05-22
 
 CI / workflow correctness release. No runtime behaviour changes.
