@@ -1,6 +1,7 @@
 # OpenProteo
 
 [![CI](https://github.com/Sigilweaver/OpenProteo/actions/workflows/ci.yml/badge.svg)](https://github.com/Sigilweaver/OpenProteo/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20470595.svg)](https://doi.org/10.5281/zenodo.20470595)
 [![crates.io](https://img.shields.io/crates/v/openproteo-io.svg)](https://crates.io/crates/openproteo-io)
 [![PyPI](https://img.shields.io/pypi/v/openproteo.svg)](https://pypi.org/project/openproteo/)
 [![docs.rs](https://img.shields.io/docsrs/openproteo-io)](https://docs.rs/openproteo-io)
