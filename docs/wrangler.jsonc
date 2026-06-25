@@ -1,17 +1,24 @@
 {
-    "name": "openproteo-docs",
-    "compatibility_date": "2024-11-26",
-    "assets": {
-        "directory": "./build"
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openproteo-docs",
+  "compatibility_date": "2026-05-22",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./build"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "routes": [
+    {
+      "pattern": "sigilweaver.app/openproteo/docs",
+      "zone_name": "sigilweaver.app"
     },
-    "routes": [
-        {
-            "pattern": "sigilweaver.app/openproteo/docs",
-            "zone_name": "sigilweaver.app"
-        },
-        {
-            "pattern": "sigilweaver.app/openproteo/docs/*",
-            "zone_name": "sigilweaver.app"
-        }
-    ]
+    {
+      "pattern": "sigilweaver.app/openproteo/docs/*",
+      "zone_name": "sigilweaver.app"
+    }
+  ]
 }
