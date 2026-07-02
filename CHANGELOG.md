@@ -6,6 +6,35 @@ All notable changes to this project will be documented in this file.
 
 - _No unreleased changes yet._
 
+## [1.2.0] - 2026-07-02
+
+### Added
+
+- `Spectrum.scan_mode` (Python): `"centroid"`, `"profile"`, or `None`.
+  Populated by all three vendor adapters; previously decoded in
+  `SpectrumRecord` but not surfaced to Python.
+- `Spectrum.analyzer` (Python): mass analyzer family as a lowercase
+  string (`"itms"`, `"tqms"`, `"sqms"`, `"tofms"`, `"ftms"`,
+  `"sector"`) or `None`. Populated by all three vendor adapters.
+- `Spectrum.filter` (Python): Thermo-style scan filter string, or
+  `None` for Bruker and Waters files.
+- `Spectrum.ion_injection_time_ms` (Python): ion injection /
+  accumulation time in milliseconds, or `None`.
+- `Spectrum.low_mz` / `Spectrum.high_mz` (Python): observed m/z
+  range endpoints, or `None`.
+- `RunInfo` class and `run_info(path)` function (Python): returns
+  run-level metadata (instrument name and CV accession, source file
+  name, acquisition timestamp, parser software name and version)
+  without iterating spectra.
+
+### Changed
+
+- `opentfraw` dependency bumped from `1.0.6` to `1.2.0`. Picks up
+  the Exploris scan-event calibration fix (profile m/z and MS2
+  precursor now decoded correctly on Exploris instruments) and the
+  new per-peak FT label, scan-parameters, profile, and
+  created-timestamp APIs contributed by @oskarsari.
+
 ## [1.1.0] - 2026-05-31
 
 ### Added
