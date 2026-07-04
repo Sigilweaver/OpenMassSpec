@@ -51,7 +51,7 @@ REPOS=(
 
 # Pretty names + version-file locations for each repo.
 declare -A VERSION_FILE
-VERSION_FILE[OpenProteo]="crates/openproteo-io-cli/Cargo.toml"
+VERSION_FILE[OpenProteo]="Cargo.toml"
 VERSION_FILE[OpenProteoCore]="Cargo.toml"
 VERSION_FILE[OpenTFRaw]="Cargo.toml"
 VERSION_FILE[OpenTimsTDF]="Cargo.toml"
@@ -104,7 +104,7 @@ repo_short_sha() {
 
 repo_is_clean() {
     local dir="$1"
-    [ -z "$(git -C "$dir" status --porcelain)" ]
+    [ -z "$(git -C "$dir" status --porcelain --untracked-files=no)" ]
 }
 
 # Collect pins.
