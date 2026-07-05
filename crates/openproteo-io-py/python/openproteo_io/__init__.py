@@ -37,6 +37,6 @@ if _HAS_ARROW:
         """
         import polars as pl
 
-        return pl.from_arrow(read_arrow(path, batch_size).read_all())
+        return pl.from_arrow(read_arrow(path, batch_size=batch_size).read_all())
 
     __all__.append("read_polars")
