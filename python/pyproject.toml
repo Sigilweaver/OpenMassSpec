@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openmassspec"
-version = "1.0.1"
-description = "Open mass spectrometry: one install for the OpenMassSpec vendor reader stack (Thermo, Bruker, Waters)"
+version = "1.1.0"
+description = "Open mass spectrometry: one install for the OpenMassSpec vendor reader stack (Thermo, Bruker, Waters, Agilent, SCIEX)"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
@@ -31,12 +31,16 @@ dependencies = ["openmassspec-io"]
 
 [project.optional-dependencies]
 # The base install always brings openmassspec-io (the vendor-agnostic Rust
-# reader). Each extra layers on a per-vendor native binding; the `all`
-# extra installs every supported vendor.
+# reader), which has every vendor - including SCIEX - compiled in, so
+# reading and mzML conversion work for all supported formats out of the
+# box. Each extra additionally installs the standalone per-vendor package
+# for direct use. SCIEX has no standalone package yet, so there is no
+# `sciex` extra; `.wiff` reading is available from the base install.
 thermo = ["opentfraw"]
 bruker = ["opentimstdf"]
 waters = ["openwraw"]
-all = ["opentfraw", "opentimstdf", "openwraw"]
+agilent = ["openaraw"]
+all = ["opentfraw", "opentimstdf", "openwraw", "openaraw"]
 
 [project.urls]
 Homepage = "https://github.com/Sigilweaver/OpenMassSpec"

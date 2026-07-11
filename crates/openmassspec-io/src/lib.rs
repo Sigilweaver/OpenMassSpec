@@ -1,10 +1,11 @@
 //! `openmassspec-io` is the umbrella crate that ties together the open
-//! Rust mass-spec parsers (`opentfraw`, `opentimstdf`, `openwraw`)
-//! behind a uniform vendor-detection + mzML-conversion API.
+//! Rust mass-spec parsers (`opentfraw`, `opentimstdf`, `openwraw`,
+//! `openaraw`, `opensxraw`) behind a uniform vendor-detection +
+//! mzML-conversion API.
 //!
 //! Each vendor parser is gated behind a Cargo feature
-//! (`thermo`, `bruker`, `waters`) and re-exported under
-//! [`vendor`]. The `all` meta-feature pulls in every supported
+//! (`thermo`, `bruker`, `waters`, `agilent`, `sciex`) and re-exported
+//! under [`vendor`]. The `all` meta-feature pulls in every supported
 //! vendor.
 //!
 //! Even with no features enabled, [`detect_format`] is available so
@@ -31,6 +32,10 @@ pub mod vendor {
     pub use opentimstdf;
     #[cfg(feature = "waters")]
     pub use openwraw;
+    #[cfg(feature = "agilent")]
+    pub use openaraw;
+    #[cfg(feature = "sciex")]
+    pub use opensxraw;
 }
 
 /// Detected on-disk vendor / format family.
@@ -44,6 +49,11 @@ pub enum VendorFormat {
     /// Waters MassLynx bundle (directory ending in `.raw/` containing
     /// `_HEADER.TXT`).
     WatersRaw,
+    /// Agilent MassHunter bundle (directory containing an `AcqData/`
+    /// subdirectory with `MSScan.bin`).
+    AgilentMassHunter,
+    /// SCIEX legacy `.wiff` file (paired with a sibling `.wiff.scan`).
+    SciexWiff,
 }
 
 impl VendorFormat {
@@ -53,6 +63,8 @@ impl VendorFormat {
             Self::ThermoRaw => "thermo",
             Self::BrukerTdf => "bruker",
             Self::WatersRaw => "waters",
+            Self::AgilentMassHunter => "agilent",
+            Self::SciexWiff => "sciex",
         }
     }
 }
@@ -76,11 +88,20 @@ pub struct Detected {
 /// time based on a runtime probe.
 pub fn detect_format(path: &Path) -> Option<Detected> {
     if path.is_dir() {
-        // Bruker .d/ first, then Waters .raw/.
+        // Bruker .d/ first, then Agilent .d/, then Waters .raw/.
+        // Bruker and Agilent both use a `.d` extension, so they are
+        // disambiguated by contents (analysis.tdf vs AcqData/MSScan.bin),
+        // not by the directory name.
         if path.join("analysis.tdf").is_file() && path.join("analysis.tdf_bin").is_file() {
             return Some(Detected {
                 path: path.to_path_buf(),
                 format: VendorFormat::BrukerTdf,
+            });
+        }
+        if path.join("AcqData").join("MSScan.bin").is_file() {
+            return Some(Detected {
+                path: path.to_path_buf(),
+                format: VendorFormat::AgilentMassHunter,
             });
         }
         if path.join("_HEADER.TXT").is_file() {
@@ -98,9 +119,31 @@ pub fn detect_format(path: &Path) -> Option<Detected> {
                 format: VendorFormat::ThermoRaw,
             });
         }
+        if is_sciex_wiff(path) {
+            return Some(Detected {
+                path: path.to_path_buf(),
+                format: VendorFormat::SciexWiff,
+            });
+        }
         return None;
     }
     None
+}
+
+/// Returns `true` if `path` looks like a SCIEX legacy `.wiff` file: a
+/// `.wiff` extension with a sibling `.wiff.scan` file alongside it (the
+/// scan data the reader needs). The extension check is case-insensitive.
+fn is_sciex_wiff(path: &Path) -> bool {
+    let is_wiff_ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("wiff"));
+    if !is_wiff_ext {
+        return false;
+    }
+    let mut scan = path.as_os_str().to_os_string();
+    scan.push(".scan");
+    Path::new(&scan).is_file()
 }
 
 /// Returns `true` if the file looks like a Thermo Finnigan `.raw`.
@@ -199,6 +242,43 @@ fn write_to(
                 Err(Error::FeatureDisabled { vendor: "waters" })
             }
         }
+        VendorFormat::AgilentMassHunter => {
+            #[cfg(feature = "agilent")]
+            {
+                // openaraw has no mzml module of its own; its Reader
+                // implements openmassspec_core::SpectrumSource, so drive
+                // the core writer directly.
+                let mut reader = openaraw::reader::Reader::open(path)?;
+                if indexed {
+                    openmassspec_core::write_indexed_mzml(&mut reader, w)?;
+                } else {
+                    openmassspec_core::write_mzml(&mut reader, w)?;
+                }
+                Ok(())
+            }
+            #[cfg(not(feature = "agilent"))]
+            {
+                let _ = (path, w, indexed);
+                Err(Error::FeatureDisabled { vendor: "agilent" })
+            }
+        }
+        VendorFormat::SciexWiff => {
+            #[cfg(feature = "sciex")]
+            {
+                let mut reader = opensxraw::reader::Reader::open(path)?;
+                if indexed {
+                    openmassspec_core::write_indexed_mzml(&mut reader, w)?;
+                } else {
+                    openmassspec_core::write_mzml(&mut reader, w)?;
+                }
+                Ok(())
+            }
+            #[cfg(not(feature = "sciex"))]
+            {
+                let _ = (path, w, indexed);
+                Err(Error::FeatureDisabled { vendor: "sciex" })
+            }
+        }
     }
 }
 
@@ -281,6 +361,28 @@ pub fn collect(
             #[cfg(not(feature = "waters"))]
             Err(Error::FeatureDisabled { vendor: "waters" })
         }
+        VendorFormat::AgilentMassHunter => {
+            #[cfg(feature = "agilent")]
+            {
+                let mut src = openaraw::reader::Reader::open(&detected.path)?;
+                let meta = src.run_metadata();
+                let recs: Vec<_> = src.iter_spectra().collect();
+                Ok((recs, meta))
+            }
+            #[cfg(not(feature = "agilent"))]
+            Err(Error::FeatureDisabled { vendor: "agilent" })
+        }
+        VendorFormat::SciexWiff => {
+            #[cfg(feature = "sciex")]
+            {
+                let mut src = opensxraw::reader::Reader::open(&detected.path)?;
+                let meta = src.run_metadata();
+                let recs: Vec<_> = src.iter_spectra().collect();
+                Ok((recs, meta))
+            }
+            #[cfg(not(feature = "sciex"))]
+            Err(Error::FeatureDisabled { vendor: "sciex" })
+        }
     }
 }
 
@@ -361,6 +463,38 @@ mod tests {
         let det = detect_format(&tmp).expect("detect");
         assert_eq!(det.format, VendorFormat::WatersRaw);
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn detect_returns_agilent_for_acqdata_layout() {
+        let tmp = tempfile_dir();
+        let acq = tmp.join("AcqData");
+        std::fs::create_dir_all(&acq).unwrap();
+        std::fs::write(acq.join("MSScan.bin"), b"").unwrap();
+        let det = detect_format(&tmp).expect("detect");
+        assert_eq!(det.format, VendorFormat::AgilentMassHunter);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn detect_returns_sciex_for_wiff_with_scan_sibling() {
+        let dir = tempfile_dir();
+        let wiff = dir.join("run.wiff");
+        std::fs::write(&wiff, b"\xd0\xcf\x11\xe0").unwrap();
+        std::fs::write(dir.join("run.wiff.scan"), b"").unwrap();
+        let det = detect_format(&wiff).expect("detect");
+        assert_eq!(det.format, VendorFormat::SciexWiff);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn detect_returns_none_for_wiff_without_scan_sibling() {
+        let dir = tempfile_dir();
+        let wiff = dir.join("lonely.wiff");
+        std::fs::write(&wiff, b"\xd0\xcf\x11\xe0").unwrap();
+        // No .wiff.scan alongside -> not a usable SCIEX pair.
+        assert!(detect_format(&wiff).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn tempfile_path() -> PathBuf {

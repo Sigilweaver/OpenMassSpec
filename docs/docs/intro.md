@@ -33,7 +33,7 @@ binary blob.
    this against the PSI-MS controlled vocabulary.
 3. **One schema across vendors.** Every reader yields the same
    `SpectrumRecord` shape; Arrow batches share a single schema across
-   Thermo / Bruker / Waters.
+   Thermo / Bruker / Waters / Agilent / SCIEX.
 4. **Streaming where possible.** Spectra are produced as an iterator;
    the mzML writer never buffers the full run.
 

@@ -65,6 +65,18 @@ fn collect_records(
             let recs: Vec<_> = src.iter_spectra().collect();
             Ok((recs, meta))
         }
+        VendorFormat::AgilentMassHunter => {
+            let mut src = openaraw::reader::Reader::open(&detected.path)?;
+            let meta = src.run_metadata();
+            let recs: Vec<_> = src.iter_spectra().collect();
+            Ok((recs, meta))
+        }
+        VendorFormat::SciexWiff => {
+            let mut src = opensxraw::reader::Reader::open(&detected.path)?;
+            let meta = src.run_metadata();
+            let recs: Vec<_> = src.iter_spectra().collect();
+            Ok((recs, meta))
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 [package]
 name = "openmassspec-io"
 version.workspace = true
-description = "Vendor-neutral mass-spec I/O: feature-gated re-exports of opentfraw / opentimstdf / openwraw with auto-detection and an mzML writer."
+description = "Vendor-neutral mass-spec I/O: feature-gated re-exports of opentfraw / opentimstdf / openwraw / openaraw / opensxraw with auto-detection and an mzML writer."
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
@@ -13,10 +13,12 @@ categories = ["science", "encoding"]
 
 [features]
 default = []
-all = ["thermo", "bruker", "waters"]
+all = ["thermo", "bruker", "waters", "agilent", "sciex"]
 thermo = ["dep:opentfraw"]
 bruker = ["dep:opentimstdf"]
 waters = ["dep:openwraw"]
+agilent = ["dep:openaraw"]
+sciex = ["dep:opensxraw"]
 arrow = ["openmassspec-core/arrow"]
 
 [dependencies]
@@ -24,6 +26,8 @@ openmassspec-core = { workspace = true }
 opentfraw = { workspace = true, optional = true }
 opentimstdf = { workspace = true, optional = true }
 openwraw = { workspace = true, optional = true }
+openaraw = { workspace = true, optional = true }
+opensxraw = { workspace = true, optional = true }
 thiserror = "2"
 
 [lints]

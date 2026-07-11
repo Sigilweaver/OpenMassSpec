@@ -1,7 +1,7 @@
 # openmassspec-io (Python)
 
 Python bindings for the [`openmassspec-io`](https://github.com/Sigilweaver/OpenMassSpec)
-Rust crate. Detect a Thermo / Bruker / Waters acquisition on disk, convert
+Rust crate. Detect a Thermo / Bruker / Waters / Agilent / SCIEX acquisition on disk, convert
 it to mzML, or stream spectra as zero-copy NumPy arrays / pyarrow record
 batches.
 

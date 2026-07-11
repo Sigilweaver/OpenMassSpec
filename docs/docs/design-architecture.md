@@ -41,7 +41,7 @@
 - **`openmassspec-core` knows nothing about vendors.** It owns the
   shared schema, the mzML byte format, the Arrow layout, and the
   conformance harness. Anything generic enough to be shared between
-  Thermo / Bruker / Waters lives here.
+  Thermo / Bruker / Waters / Agilent / SCIEX lives here.
 - **Vendor crates know nothing about each other.** Each implements
   `SpectrumSource` and a `write_mzml(path, writer)` helper. They
   depend on `openmassspec-core` and zero other vendor crates.

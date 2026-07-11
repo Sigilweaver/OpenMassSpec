@@ -42,6 +42,16 @@ pub enum Error {
     #[error(transparent)]
     Waters(#[from] openwraw::Error),
 
+    /// Agilent (`openaraw`) error.
+    #[cfg(feature = "agilent")]
+    #[error(transparent)]
+    Agilent(#[from] openaraw::Error),
+
+    /// SCIEX (`opensxraw`) error.
+    #[cfg(feature = "sciex")]
+    #[error(transparent)]
+    Sciex(#[from] opensxraw::Error),
+
     /// mzML parsing error. Kept as a string until `mzdata` exposes a
     /// typed error suitable for `#[from]`.
     #[error("mzML error: {0}")]

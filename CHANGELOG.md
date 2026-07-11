@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-11
+
+### Added
+
+- Agilent and SCIEX support, so the umbrella now covers all five vendor
+  readers in the stack through one API:
+  - New `agilent` feature (pulls in [`openaraw`](https://github.com/Sigilweaver/OpenARaw))
+    and `sciex` feature (pulls in [`opensxraw`](https://github.com/Sigilweaver/OpenSXRaw)).
+    Both are included in the `all` meta-feature.
+  - `detect_format` now recognizes Agilent MassHunter `.d/` bundles (by
+    `AcqData/MSScan.bin`) and SCIEX legacy `.wiff` files (by a `.wiff`
+    extension with a sibling `.wiff.scan`).
+  - `VendorFormat::AgilentMassHunter` and `VendorFormat::SciexWiff`
+    variants; `convert_to_mzml` / `convert_to_mzml_writer` / `collect`
+    dispatch to them.
+  - `vendor2mzml` CLI handles both automatically (built with `all`).
+  - Python: `.wiff` and Agilent `.d/` read through the base
+    `openmassspec` install (the binding compiles in every vendor). New
+    `openmassspec[agilent]` extra installs the standalone `openaraw`
+    package; SCIEX has no standalone Python package yet, so there is no
+    `sciex` extra (reading still works from the base install).
+
 ## [1.0.1] - 2026-07-11
 
 ### Fixed

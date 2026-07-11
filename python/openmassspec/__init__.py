@@ -1,21 +1,28 @@
-"""OpenMassSpec: open proteomics vendor reader stack.
+"""OpenMassSpec: open mass spectrometry vendor reader stack.
 
 This metapackage is the single pip install surface for the stack. The
 base install always brings ``openmassspec_io`` (the Rust-backed reader
-that converts vendor inputs to mzML / Arrow); the per-vendor extras
-layer on direct Python bindings for each native vendor package:
+that converts vendor inputs to mzML / Arrow). It has every vendor -
+including SCIEX - compiled in, so ``detect_format`` / ``to_mzml`` /
+``iter_spectra`` work for all supported formats out of the box. The
+per-vendor extras additionally install the standalone Python binding
+for direct use:
 
 * ``opentfraw``   - Thermo `.raw` files
 * ``opentimstdf`` - Bruker timsTOF `.d/` bundles
 * ``openwraw``    - Waters MassLynx `.raw/` directories
+* ``openaraw``    - Agilent MassHunter `.d/` bundles
+* SCIEX `.wiff` reading is available from the base install; there is no
+  standalone SCIEX Python package yet, so no ``sciex`` extra.
 
 Install the umbrella::
 
-    pip install openmassspec            # openmassspec_io only
+    pip install openmassspec            # openmassspec_io only (all vendors readable)
     pip install openmassspec[thermo]    # + opentfraw
     pip install openmassspec[bruker]    # + opentimstdf
     pip install openmassspec[waters]    # + openwraw
-    pip install openmassspec[all]       # + all vendor extensions
+    pip install openmassspec[agilent]   # + openaraw
+    pip install openmassspec[all]       # + all standalone vendor bindings
 
 Top-level helpers fall into two layers:
 
@@ -65,11 +72,12 @@ __all__ = [
     "to_mzml",
 ]
 
-VENDORS = ("thermo", "bruker", "waters")
+VENDORS = ("thermo", "bruker", "waters", "agilent", "sciex")
 
 
 def detect(path: str | os.PathLike[str]) -> Optional[str]:
-    """Return ``"thermo"``, ``"bruker"``, ``"waters"`` or ``None`` for *path*.
+    """Return ``"thermo"``, ``"bruker"``, ``"waters"``, ``"agilent"``,
+    ``"sciex"`` or ``None`` for *path*.
 
     The check is purely structural (extension + sentinel files); no vendor
     reader needs to be importable.
@@ -77,12 +85,19 @@ def detect(path: str | os.PathLike[str]) -> Optional[str]:
     p = Path(path)
     if not p.exists():
         return None
-    if p.is_file() and p.suffix.lower() == ".raw":
-        return "thermo"
+    if p.is_file():
+        if p.suffix.lower() == ".raw":
+            return "thermo"
+        # SCIEX: a .wiff file with its paired .wiff.scan alongside.
+        if p.suffix.lower() == ".wiff" and Path(str(p) + ".scan").is_file():
+            return "sciex"
     if p.is_dir():
         suffix = p.suffix.lower()
+        # Bruker and Agilent both use a .d directory; disambiguate by contents.
         if suffix == ".d" and (p / "analysis.tdf").is_file():
             return "bruker"
+        if (p / "AcqData" / "MSScan.bin").is_file():
+            return "agilent"
         if suffix == ".raw" and any(
             (p / name).exists()
             for name in ("_FUNCTNS.INF", "_extern.inf", "_HEADER.TXT")
@@ -112,4 +127,14 @@ def open_run(path: str | os.PathLike[str]):
         import openwraw  # type: ignore[import-not-found]
 
         return openwraw.RawReader(str(path))
+    if kind == "agilent":
+        import openaraw  # type: ignore[import-not-found]
+
+        return openaraw.RawReader(str(path))
+    if kind == "sciex":
+        raise ImportError(
+            "SCIEX .wiff reading has no standalone Python package yet; use "
+            "openmassspec.to_mzml() / iter_spectra() / detect_format(), which "
+            "read .wiff through the built-in openmassspec_io reader."
+        )
     raise ValueError(f"unhandled vendor kind: {kind}")
