@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "openmassspec-io"
-version = "1.0.0"
+version = "1.0.1"
 description = "Vendor-neutral mass-spec I/O: Thermo / Bruker / Waters to mzML, with Arrow streaming. Python bindings to the openmassspec-io Rust crate."
 readme = "README.md"
 license = { text = "Apache-2.0" }

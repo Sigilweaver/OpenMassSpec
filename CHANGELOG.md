@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-11
+
+### Fixed
+
+- `opentfraw`/`opentimstdf`/`openwraw` workspace dependency requirements
+  were left at their pre-rename minimums (`1.2.0`/`1.0.6`/`1.0.5`), which
+  a fresh consumer could satisfy with an old vendor-crate version still
+  depending on `openproteo-core` - a different (incompatible) trait from
+  `openmassspec-core`, breaking the build. Bumped to `1.3.1`/`1.2.3`/`1.2.2`,
+  the first versions of each that depend on `openmassspec-core`.
+
 ## [1.0.0] - 2026-07-10
 
 Renamed from OpenProteo / `openproteo-io` / `openproteo`. The vendor
