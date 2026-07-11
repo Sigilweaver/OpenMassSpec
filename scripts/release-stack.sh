@@ -47,6 +47,8 @@ REPOS=(
     "OpenTFRaw"
     "OpenTimsTDF"
     "OpenWRaw"
+    "OpenARaw"
+    "OpenSXRaw"
 )
 
 # Pretty names + version-file locations for each repo.
@@ -56,6 +58,8 @@ VERSION_FILE[OpenMassSpecCore]="Cargo.toml"
 VERSION_FILE[OpenTFRaw]="Cargo.toml"
 VERSION_FILE[OpenTimsTDF]="Cargo.toml"
 VERSION_FILE[OpenWRaw]="Cargo.toml"
+VERSION_FILE[OpenARaw]="Cargo.toml"
+VERSION_FILE[OpenSXRaw]="Cargo.toml"
 
 declare -A DISPLAY_NAME
 DISPLAY_NAME[OpenMassSpec]="OpenMassSpec (umbrella)"
@@ -63,6 +67,8 @@ DISPLAY_NAME[OpenMassSpecCore]="openmassspec-core"
 DISPLAY_NAME[OpenTFRaw]="opentfraw"
 DISPLAY_NAME[OpenTimsTDF]="opentimstdf"
 DISPLAY_NAME[OpenWRaw]="openwraw"
+DISPLAY_NAME[OpenARaw]="openaraw"
+DISPLAY_NAME[OpenSXRaw]="opensxraw"
 
 # Defaults.
 TAG_NAME=""
