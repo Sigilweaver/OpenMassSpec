@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Upgraded `pyo3`/`numpy` from 0.28 to 0.29 and `arrow` from 58 to 59 in
+  `openmassspec-io-py`, clearing RUSTSEC-2026-0176 and RUSTSEC-2026-0177.
+  Required bumping the `openmassspec-core` dependency to 1.1.1 (its
+  `arrow` feature needed the matching arrow bump, since only one pyo3
+  version can be linked into a given binary). The `cargo audit` CI job
+  no longer needs to `--ignore` those two advisories; it still ignores
+  RUSTSEC-2026-0194/0195 (quick-xml), which is a transitive dependency
+  via `mzdata` and blocked upstream - `mzdata` pins `quick-xml = "^0.30"`
+  even on its `main` branch. Tracked in #4.
+
+### Versioning note
+
+- The next `openmassspec-io`/`openmassspec` release should jump straight
+  to **1.4.0**, not the normal next increment. Pre-rename (OpenProteo)
+  this repo's tag lineage reached `v1.3.0`; post-rename versioning
+  restarted at `1.0.0` and has not yet caught back up (currently at
+  1.2.0/1.2.1), so every release through `1.3.x` still needs the
+  `-openmassspec` tag-suffix workaround to avoid colliding with the old
+  plain-numbered tags. Jumping to 1.4.0 clears the old lineage in one
+  step; every release after that is a normal bump with no suffix check
+  needed for this package. (`openmassspec-core` doesn't need this - its
+  pre-rename ceiling was `v1.0.1` and it's already past it at 1.1.0.)
+
 ## [1.2.1] - 2026-07-12
 
 ### Fixed

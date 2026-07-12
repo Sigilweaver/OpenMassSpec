@@ -29,11 +29,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@cargo-audit
-      # Advisories tracked in Sigilweaver/OpenMassSpec#4; remove these --ignore flags once
-      # that upgrade lands.
+      # quick-xml (RUSTSEC-2026-0194/0195) is a transitive dep via mzdata,
+      # which pins quick-xml ^0.30 even on its main branch. Blocked upstream;
+      # tracked in Sigilweaver/OpenMassSpec#4 and filed against mzdata.
       - run: >
           cargo audit
-          --ignore RUSTSEC-2026-0176
-          --ignore RUSTSEC-2026-0177
           --ignore RUSTSEC-2026-0194
           --ignore RUSTSEC-2026-0195
