@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-12
+
+### Fixed
+
+- The `openmassspec` metapackage's `python/pyproject.toml` version was
+  left at 1.1.0 during the 1.2.0 cut, so its PyPI publish step silently
+  no-opped (`skip-existing`) instead of uploading. No functional change;
+  version-only fix so the metapackage actually reaches PyPI at parity
+  with `openmassspec-io` 1.2.0.
+
 ## [1.2.0] - 2026-07-12
 
 ### Added
