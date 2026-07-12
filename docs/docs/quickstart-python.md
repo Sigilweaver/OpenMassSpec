@@ -54,6 +54,25 @@ reader = op.open_run("sample.raw") # opentfraw.RawFile / opentimstdf.Reader / ..
 `open_run` requires the matching extra to be installed; otherwise it
 raises `ImportError`.
 
+## Centroid on the way out
+
+`to_mzml`, `run_info`, `iter_spectra`, and `read_arrow` all take a
+`centroid` keyword (default `False`) and a `centroid_min_intensity`
+noise floor (default `None`, ignored unless `centroid=True`). Centroiding
+is local-maxima peak picking over profile-mode spectra; spectra already
+tagged centroid pass through unchanged. It is opt-in everywhere - a
+plain call never discards profile data.
+
+```python
+import openmassspec_io as op
+
+op.to_mzml("sample.raw", "sample.mzML", centroid=True)
+op.to_mzml("sample.raw", "sample.mzML", centroid=True, centroid_min_intensity=500.0)
+
+for s in op.iter_spectra("sample.raw", centroid=True):
+    assert s.scan_mode == "centroid"
+```
+
 ## Iterate spectra (numpy)
 
 `iter_spectra` yields `Spectrum` objects whose peak arrays are

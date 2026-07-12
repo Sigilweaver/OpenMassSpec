@@ -91,6 +91,32 @@ def test_iter_spectra_yields_numpy_arrays(vendor: str):
 
 
 @pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_to_mzml_centroid_removes_profile_spectra(vendor: str, tmp_path: Path):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    out = tmp_path / f"{vendor}-centroid.mzML"
+    opio.to_mzml(str(path), str(out), centroid=True)
+    text = out.read_text(errors="replace")
+    assert 'accession="MS:1000128"' not in text, "profile spectrum cvParam survived --centroid"
+    assert 'accession="MS:1000127"' in text, "no centroid spectrum cvParam at all"
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_iter_spectra_centroid_flag_marks_every_spectrum_centroid(vendor: str):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    n = 0
+    for spec in opio.iter_spectra(str(path), centroid=True):
+        assert spec.scan_mode == "centroid"
+        n += 1
+        if n >= 50:
+            break
+    assert n > 0
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
 def test_read_arrow(vendor: str):
     if not hasattr(opio, "read_arrow"):
         pytest.skip("built without arrow feature")

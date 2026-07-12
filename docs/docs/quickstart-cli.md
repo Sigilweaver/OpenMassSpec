@@ -20,6 +20,21 @@ vendor2mzml convert sample.raw sample.mzML.gz
 hash, so downstream tools (mzML2HDF, ProteoWizard's `msconvert`,
 `MzIdentML` builders) can index-jump into the file.
 
+## Centroid on the way out
+
+```sh
+vendor2mzml convert sample.raw sample.mzML --centroid
+vendor2mzml convert sample.raw sample.mzML --centroid --centroid-min-intensity 500
+```
+
+`--centroid` centroids every profile-mode spectrum before writing
+(local-maxima peak picking; spectra already tagged centroid pass
+through unchanged). It is off by default - a plain `convert` never
+discards profile data. `--centroid-min-intensity` discards picked peaks
+below that height and is ignored unless `--centroid` is set. `info`
+takes the same two flags, for a peak-count summary post-centroiding
+without writing mzML.
+
 ## Validate
 
 ```sh

@@ -23,11 +23,6 @@ arrow = ["openmassspec-io/arrow", "openmassspec-core/arrow", "dep:arrow"]
 [dependencies]
 openmassspec-core = { workspace = true }
 openmassspec-io = { path = "../openmassspec-io", features = ["all"] }
-opentfraw = { workspace = true }
-opentimstdf = { workspace = true }
-openwraw = { workspace = true }
-openaraw = { workspace = true }
-opensxraw = { workspace = true }
 pyo3 = { version = "0.28", features = ["extension-module", "abi3-py39"] }
 numpy = "0.28"
 arrow = { version = "58", features = ["pyarrow"], optional = true }

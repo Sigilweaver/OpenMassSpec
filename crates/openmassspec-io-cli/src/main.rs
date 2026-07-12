@@ -16,7 +16,10 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use openmassspec_core::conformance::assert_iter_invariants;
 use openmassspec_core::SpectrumRecord;
-use openmassspec_io::{collect, convert_to_mzml_writer, detect_format, Detected};
+use openmassspec_io::{
+    collect, collect_centroided, convert_to_mzml_writer, convert_to_mzml_writer_centroided,
+    detect_format, Detected,
+};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -53,6 +56,14 @@ struct ConvertArgs {
     /// Emit indexed mzML (writes an `<indexList>` and SHA-1 hash).
     #[arg(long)]
     indexed: bool,
+    /// Centroid every profile-mode spectrum before writing (local-maxima
+    /// peak picking; already-centroid spectra pass through unchanged).
+    #[arg(long)]
+    centroid: bool,
+    /// Discard picked peaks below this intensity when `--centroid` is
+    /// set. Ignored otherwise.
+    #[arg(long)]
+    centroid_min_intensity: Option<f32>,
     /// Emit timing and record counts on stderr in the chosen format.
     #[arg(long, value_enum)]
     profile: Option<ProfileFormat>,
@@ -72,6 +83,13 @@ struct ValidateArgs {
 struct InfoArgs {
     /// Input path.
     input: PathBuf,
+    /// Centroid every profile-mode spectrum before summarizing.
+    #[arg(long)]
+    centroid: bool,
+    /// Discard picked peaks below this intensity when `--centroid` is
+    /// set. Ignored otherwise.
+    #[arg(long)]
+    centroid_min_intensity: Option<f32>,
     /// Emit the summary as a single JSON object on stdout.
     #[arg(long)]
     json: bool,
@@ -128,7 +146,17 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    if let Err(e) = convert_to_mzml_writer(detected, &mut writer, args.indexed) {
+    let convert_result = if args.centroid {
+        convert_to_mzml_writer_centroided(
+            detected,
+            &mut writer,
+            args.indexed,
+            args.centroid_min_intensity,
+        )
+    } else {
+        convert_to_mzml_writer(detected, &mut writer, args.indexed)
+    };
+    if let Err(e) = convert_result {
         eprintln!("error: {e}");
         return ExitCode::from(1);
     }
@@ -207,7 +235,12 @@ fn run_info(args: InfoArgs) -> ExitCode {
         return ExitCode::from(1);
     };
     let t_start = Instant::now();
-    let (records, metadata) = match collect(detected.clone()) {
+    let collect_result = if args.centroid {
+        collect_centroided(detected.clone(), args.centroid_min_intensity)
+    } else {
+        collect(detected.clone())
+    };
+    let (records, metadata) = match collect_result {
         Ok(p) => p,
         Err(e) => {
             eprintln!("error: collect: {e}");

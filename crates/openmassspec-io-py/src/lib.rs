@@ -3,10 +3,16 @@
 //! Exposes a small, vendor-neutral surface:
 //!
 //! * `detect(path) -> str | None`
-//! * `to_mzml(input, output, *, indexed=True) -> None`
-//! * `iter_spectra(path) -> Iterator[Spectrum]`
-//! * `read_arrow(path, batch_size=1024) -> pyarrow.RecordBatchReader`
+//! * `to_mzml(input, output, *, indexed=True, centroid=False, centroid_min_intensity=None) -> None`
+//! * `iter_spectra(path, *, centroid=False, centroid_min_intensity=None) -> Iterator[Spectrum]`
+//! * `read_arrow(path, batch_size=1024, *, centroid=False, centroid_min_intensity=None) -> pyarrow.RecordBatchReader`
 //!   (built when the `arrow` feature is enabled, which is the default).
+//!
+//! `centroid=True` centroids every profile-mode spectrum (local-maxima
+//! peak picking via `openmassspec_core::Centroided`); already-centroid
+//! spectra pass through unchanged. `centroid_min_intensity` discards
+//! picked peaks below that noise floor and is ignored unless `centroid`
+//! is set.
 //!
 //! All m/z, intensity, and inverse-mobility arrays handed to Python are
 //! created via `numpy::PyArray1::from_vec_bound`, which transfers
@@ -19,8 +25,8 @@
 use std::path::{Path, PathBuf};
 
 use numpy::PyArray1;
-use openmassspec_core::{Activation, Polarity, PrecursorInfo, SpectrumRecord, SpectrumSource};
-use openmassspec_io::{detect_format, Detected, VendorFormat};
+use openmassspec_core::{Activation, Polarity, PrecursorInfo, SpectrumRecord};
+use openmassspec_io::{detect_format, Detected};
 use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -44,57 +50,20 @@ fn detected_or_err(path: &Path) -> PyResult<Detected> {
     })
 }
 
-/// Collect every spectrum from `detected` into a single `Vec`. This is
-/// the v0.1.0 strategy: simple, predictable, and matches what the
-/// Bruker and Waters adapters already do internally. A streaming
-/// variant is on the roadmap.
+/// Collect every spectrum from `detected` into a single `Vec`, optionally
+/// centroiding every profile-mode spectrum first. Delegates to
+/// `openmassspec_io::collect`/`collect_centroided`, which already know how
+/// to construct each vendor's reader.
 fn collect_records(
     detected: &Detected,
+    centroid: bool,
+    min_intensity: Option<f32>,
 ) -> openmassspec_io::Result<(Vec<SpectrumRecord>, openmassspec_core::RunMetadata)> {
-    match detected.format {
-        VendorFormat::ThermoRaw => collect_thermo(&detected.path),
-        VendorFormat::BrukerTdf => {
-            let mut src = opentimstdf::mzml::TdfSource::open(&detected.path)?;
-            let meta = src.run_metadata();
-            let recs: Vec<_> = src.iter_spectra().collect();
-            Ok((recs, meta))
-        }
-        VendorFormat::WatersRaw => {
-            let mut src = openwraw::mzml::WatersSource::open(&detected.path)?;
-            let meta = src.run_metadata();
-            let recs: Vec<_> = src.iter_spectra().collect();
-            Ok((recs, meta))
-        }
-        VendorFormat::AgilentMassHunter => {
-            let mut src = openaraw::reader::Reader::open(&detected.path)?;
-            let meta = src.run_metadata();
-            let recs: Vec<_> = src.iter_spectra().collect();
-            Ok((recs, meta))
-        }
-        VendorFormat::SciexWiff => {
-            let mut src = opensxraw::reader::Reader::open(&detected.path)?;
-            let meta = src.run_metadata();
-            let recs: Vec<_> = src.iter_spectra().collect();
-            Ok((recs, meta))
-        }
+    if centroid {
+        openmassspec_io::collect_centroided(detected.clone(), min_intensity)
+    } else {
+        openmassspec_io::collect(detected.clone())
     }
-}
-
-fn collect_thermo(
-    path: &Path,
-) -> openmassspec_io::Result<(Vec<SpectrumRecord>, openmassspec_core::RunMetadata)> {
-    use std::fs::File;
-    use std::io::BufReader;
-    let raw = opentfraw::RawFileReader::open_path(path)?;
-    let mut source = BufReader::with_capacity(2 << 20, File::open(path)?);
-    let filename = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown.raw");
-    let mut src = opentfraw::mzml::OpenTfRawSource::new(&raw, &mut source, filename, false);
-    let meta = src.run_metadata();
-    let recs: Vec<_> = src.iter_spectra().collect();
-    Ok((recs, meta))
 }
 
 fn map_err<E: std::fmt::Display>(e: E) -> PyErr {
@@ -373,27 +342,63 @@ fn detect(path: PathBuf) -> Option<&'static str> {
     detect_format(&path).map(|d| d.format.name())
 }
 
-/// Convert a vendor acquisition to mzML.
+/// Convert a vendor acquisition to mzML. When `centroid` is set, every
+/// profile-mode spectrum is centroided first (local-maxima peak picking;
+/// already-centroid spectra pass through unchanged). `centroid_min_intensity`
+/// discards picked peaks below that noise floor and is ignored unless
+/// `centroid` is set.
 #[pyfunction]
-#[pyo3(signature = (input, output, *, indexed = true))]
-fn to_mzml(input: PathBuf, output: PathBuf, indexed: bool) -> PyResult<()> {
+#[pyo3(signature = (input, output, *, indexed = true, centroid = false, centroid_min_intensity = None))]
+fn to_mzml(
+    input: PathBuf,
+    output: PathBuf,
+    indexed: bool,
+    centroid: bool,
+    centroid_min_intensity: Option<f32>,
+) -> PyResult<()> {
     let detected = detected_or_err(&input)?;
-    openmassspec_io::convert_to_mzml(detected, &output, indexed).map_err(map_err)
+    if centroid {
+        openmassspec_io::convert_to_mzml_centroided(
+            detected,
+            &output,
+            indexed,
+            centroid_min_intensity,
+        )
+        .map_err(map_err)
+    } else {
+        openmassspec_io::convert_to_mzml(detected, &output, indexed).map_err(map_err)
+    }
 }
 
 /// Return run-level metadata for a vendor acquisition without iterating spectra.
 #[pyfunction]
-fn run_info(py: Python<'_>, path: PathBuf) -> PyResult<RunInfo> {
+#[pyo3(signature = (path, *, centroid = false, centroid_min_intensity = None))]
+fn run_info(
+    py: Python<'_>,
+    path: PathBuf,
+    centroid: bool,
+    centroid_min_intensity: Option<f32>,
+) -> PyResult<RunInfo> {
     let detected = detected_or_err(&path)?;
-    let (_records, meta) = py.detach(|| collect_records(&detected)).map_err(map_err)?;
+    let (_records, meta) = py
+        .detach(|| collect_records(&detected, centroid, centroid_min_intensity))
+        .map_err(map_err)?;
     Ok(RunInfo { meta })
 }
 
 /// Iterate every spectrum in a vendor acquisition.
 #[pyfunction]
-fn iter_spectra(py: Python<'_>, path: PathBuf) -> PyResult<Py<SpectrumIter>> {
+#[pyo3(signature = (path, *, centroid = false, centroid_min_intensity = None))]
+fn iter_spectra(
+    py: Python<'_>,
+    path: PathBuf,
+    centroid: bool,
+    centroid_min_intensity: Option<f32>,
+) -> PyResult<Py<SpectrumIter>> {
     let detected = detected_or_err(&path)?;
-    let (records, _meta) = py.detach(|| collect_records(&detected)).map_err(map_err)?;
+    let (records, _meta) = py
+        .detach(|| collect_records(&detected, centroid, centroid_min_intensity))
+        .map_err(map_err)?;
     Py::new(
         py,
         SpectrumIter {
@@ -416,17 +421,21 @@ mod arrow_bridge {
     /// Build a `pyarrow.RecordBatchReader` over every spectrum in the
     /// acquisition, batched at `batch_size` rows (default 1024).
     #[pyfunction]
-    #[pyo3(signature = (path, *, batch_size = 1024))]
+    #[pyo3(signature = (path, *, batch_size = 1024, centroid = false, centroid_min_intensity = None))]
     pub(super) fn read_arrow<'py>(
         py: Python<'py>,
         path: PathBuf,
         batch_size: usize,
+        centroid: bool,
+        centroid_min_intensity: Option<f32>,
     ) -> PyResult<Bound<'py, PyAny>> {
         if batch_size == 0 {
             return Err(PyValueError::new_err("batch_size must be > 0"));
         }
         let detected = detected_or_err(&path)?;
-        let (records, meta) = py.detach(|| collect_records(&detected)).map_err(map_err)?;
+        let (records, meta) = py
+            .detach(|| collect_records(&detected, centroid, centroid_min_intensity))
+            .map_err(map_err)?;
         let mobility_kind = meta.mobility_array_kind;
         let batches = py
             .detach(|| build_batches(records, batch_size, mobility_kind))

@@ -28,6 +28,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Centroid on the way out
+
+`collect`, `convert_to_mzml`, and `convert_to_mzml_writer` each have a
+`_centroided` sibling that peak-picks every profile-mode spectrum first
+(spectra already tagged centroid pass through unchanged) via
+`openmassspec_core::Centroided`. They take an extra
+`min_intensity: Option<f32>` noise floor. Plain `collect` /
+`convert_to_mzml` never centroid - this is always opt-in:
+
+```rust,no_run
+use std::path::Path;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let detected = openmassspec_io::detect_format(Path::new("sample.raw"))
+        .ok_or("not a recognized vendor format")?;
+    openmassspec_io::convert_to_mzml_centroided(
+        detected,
+        Path::new("sample.mzML"),
+        /* indexed = */ true,
+        /* min_intensity = */ Some(500.0),
+    )?;
+    Ok(())
+}
+```
+
 ## Iterate spectra without writing mzML
 
 ```rust,no_run

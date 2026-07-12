@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-12
+
+### Added
+
+- Optional centroiding across the whole stack, built on
+  `openmassspec-core` 1.1.0's new `Centroided` adapter (local-maxima peak
+  picking; already-centroid spectra pass through unchanged). Off by
+  default everywhere - profile data is never silently discarded.
+  - Rust: `collect_centroided`, `convert_to_mzml_centroided`, and
+    `convert_to_mzml_writer_centroided` in `openmassspec-io`, each taking
+    a `min_intensity: Option<f32>` noise floor alongside the existing
+    `collect` / `convert_to_mzml` / `convert_to_mzml_writer`.
+  - CLI: `vendor2mzml convert --centroid [--centroid-min-intensity <f32>]`
+    and `vendor2mzml info --centroid [--centroid-min-intensity <f32>]`.
+  - Python: `centroid` / `centroid_min_intensity` keyword arguments on
+    `to_mzml`, `run_info`, `iter_spectra`, and `read_arrow`.
+
 ## [1.1.0] - 2026-07-11
 
 ### Added
