@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-13
+
 ### Added
 
 - `openmassspec-io` gains `stream`/`stream_centroided` (visit each spectrum
@@ -18,6 +20,13 @@ All notable changes to this project will be documented in this file.
   any spectra, and `read_arrow` builds its Arrow batches incrementally
   via `stream`/`stream_centroided` instead of materializing the whole run
   as `SpectrumRecord`s first. Closes #3.
+- Bumped `openwraw` to 1.2.3 and `opentimstdf` to 1.2.5: both crates'
+  `iter_spectra` previously buffered (and in Waters' case, also cloned)
+  the whole run into a `Vec` before yielding anything, regardless of how
+  it was consumed. Without this bump, `stream`/`stream_centroided` would
+  call through to an eager `iter_spectra` for the Waters and Bruker
+  backends specifically, silently defeating the memory-bounding this
+  release adds for those two vendors.
 
 ### Security
 
@@ -33,16 +42,14 @@ All notable changes to this project will be documented in this file.
 
 ### Versioning note
 
-- The next `openmassspec-io`/`openmassspec` release should jump straight
-  to **1.4.0**, not the normal next increment. Pre-rename (OpenProteo)
-  this repo's tag lineage reached `v1.3.0`; post-rename versioning
-  restarted at `1.0.0` and has not yet caught back up (currently at
-  1.2.0/1.2.1), so every release through `1.3.x` still needs the
-  `-openmassspec` tag-suffix workaround to avoid colliding with the old
-  plain-numbered tags. Jumping to 1.4.0 clears the old lineage in one
-  step; every release after that is a normal bump with no suffix check
-  needed for this package. (`openmassspec-core` doesn't need this - its
-  pre-rename ceiling was `v1.0.1` and it's already past it at 1.1.0.)
+- This release jumps straight to **1.4.0**, not the normal next
+  increment. Pre-rename (OpenProteo) this repo's tag lineage reached
+  `v1.3.0`; post-rename versioning restarted at `1.0.0` and had not yet
+  caught back up (was at 1.2.0/1.2.1), so every release through `1.3.x`
+  needed the `-openmassspec` tag-suffix workaround to avoid colliding
+  with the old plain-numbered tags. This jump clears the old lineage in
+  one step; every release after this one is a normal bump with no
+  suffix check needed for this package.
 
 ## [1.2.1] - 2026-07-12
 

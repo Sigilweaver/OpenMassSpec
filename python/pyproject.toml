@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openmassspec"
-version = "1.2.1"
+version = "1.4.0"
 description = "Open mass spectrometry: one install for the OpenMassSpec vendor reader stack (Thermo, Bruker, Waters, Agilent, SCIEX)"
 readme = "README.md"
 license = { text = "Apache-2.0" }
