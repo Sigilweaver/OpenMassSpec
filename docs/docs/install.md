@@ -4,7 +4,7 @@
 
 OpenMassSpec targets Rust 2021, MSRV 1.75. The umbrella workspace lives
 at the `OpenMassSpec` repository and pulls the vendor crates in via
-path dependencies; for a stand-alone build, clone all five repos side
+path dependencies; for a stand-alone build, clone all seven repos side
 by side:
 
 ```text
@@ -14,6 +14,8 @@ by side:
 +-- OpenTFRaw/
 +-- OpenTimsTDF/
 +-- OpenWRaw/
++-- OpenARaw/
++-- OpenSXRaw/
 ```
 
 Then build the CLI:

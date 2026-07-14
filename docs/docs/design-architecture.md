@@ -1,40 +1,30 @@
 # Architecture
 
-```text
-                  +------------------------+
-                  |    openmassspec-core     |
-                  |  - SpectrumRecord      |
-                  |  - SpectrumSource trait|
-                  |  - mzML writer         |
-                  |  - Arrow schema        |
-                  |  - Conformance harness |
-                  +-----------+------------+
-                              ^
-            +-----------------+-----------------+
-            |                 |                 |
-     +------+------+   +------+------+   +------+------+
-     |  opentfraw  |   | opentimstdf |   |   openwraw  |
-     |   (Thermo)  |   |  (Bruker)   |   |   (Waters)  |
-     +------+------+   +------+------+   +------+------+
-            |                 |                 |
-            +--------+--------+--------+--------+
-                     |        |        |
-                     v        v        v
-                  +-----------------------+
-                  |    openmassspec-io      |
-                  |  - detect_format()    |
-                  |  - convert_to_mzml()  |
-                  |  - collect()          |
-                  |  - VecSource          |
-                  +-----------+-----------+
-                              |
-              +---------------+---------------+
-              |                               |
-     +--------+--------+             +--------+--------+
-     | openmassspec-io-cli |           | openmassspec-io-py |
-     |  (vendor2mzml)    |           |  (PyO3 bindings) |
-     +-------------------+           +------------------+
+```mermaid
+graph TD
+    core["<b>openmassspec-core</b><br/>SpectrumRecord · SpectrumSource trait<br/>mzML writer · Arrow schema<br/>Conformance harness"]
+
+    tfraw["opentfraw<br/>(Thermo)"] --> core
+    tdf["opentimstdf<br/>(Bruker)"] --> core
+    wraw["openwraw<br/>(Waters)"] --> core
+    araw["openaraw<br/>(Agilent)"] --> core
+    sxraw["opensxraw<br/>(SCIEX)"] --> core
+
+    io["<b>openmassspec-io</b><br/>detect_format() · convert_to_mzml()<br/>collect() · VecSource"]
+    io --> tfraw
+    io --> tdf
+    io --> wraw
+    io --> araw
+    io --> sxraw
+
+    cli["openmassspec-io-cli<br/>(vendor2mzml)"] --> io
+    py["openmassspec-io-py<br/>(PyO3 bindings)"] --> io
 ```
+
+Each arrow is a Cargo dependency edge (`A --> B` means "A depends on
+B"). Every vendor crate depends on `openmassspec-core` and nothing
+else in the stack; `openmassspec-io` is the only crate that depends on
+more than one vendor crate at a time.
 
 ## Layering rules
 

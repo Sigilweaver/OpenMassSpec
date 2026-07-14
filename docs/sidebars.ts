@@ -31,6 +31,8 @@ const sidebars: SidebarsConfig = {
                 'vendor-thermo',
                 'vendor-bruker',
                 'vendor-waters',
+                'vendor-agilent',
+                'vendor-sciex',
             ],
         },
         {

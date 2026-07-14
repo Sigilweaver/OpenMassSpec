@@ -22,11 +22,11 @@ openmassspec-core = { version = "0.1", features = ["arrow"] }
 
 ## The `SpectrumSource` trait
 
-Every vendor parser (`opentfraw`, `opentimstdf`, `openwraw`) implements
-this trait. Anything downstream of a parser - the canonical mzML
-writer, the Arrow batch builder, the conformance harness, the
-`openmassspec-io` umbrella, the `vendor2mzml` CLI - operates against
-`&mut dyn SpectrumSource`.
+Every vendor parser (`opentfraw`, `opentimstdf`, `openwraw`, `openaraw`,
+`opensxraw`) implements this trait. Anything downstream of a parser -
+the canonical mzML writer, the Arrow batch builder, the conformance
+harness, the `openmassspec-io` umbrella, the `vendor2mzml` CLI -
+operates against `&mut dyn SpectrumSource`.
 
 ```rust
 use openmassspec_core::{RunMetadata, SpectrumRecord, ChromatogramRecord};
@@ -130,18 +130,23 @@ The canonical schema is documented in
 
 ## Where it sits in the stack
 
-```text
-              openmassspec-core   (this crate)
-                     ^
-        +------------+------------+
-        |            |            |
-   opentfraw    opentimstdf    openwraw       (vendor parsers)
-        |            |            |
-        +------------+------------+
-                     v
-               openmassspec-io      (umbrella: detect_format, collect, to_mzml)
-                     |
-        +------------+------------+
-        |                         |
-  vendor2mzml CLI            openmassspec (Python metapackage)
+```mermaid
+graph TD
+    core["openmassspec-core (this crate)"]
+
+    tfraw[opentfraw] --> core
+    tdf[opentimstdf] --> core
+    wraw[openwraw] --> core
+    araw[openaraw] --> core
+    sxraw[opensxraw] --> core
+
+    io["openmassspec-io<br/>(umbrella: detect_format, collect, to_mzml)"]
+    io --> tfraw
+    io --> tdf
+    io --> wraw
+    io --> araw
+    io --> sxraw
+
+    cli[vendor2mzml CLI] --> io
+    py["openmassspec (Python metapackage)"] --> io
 ```

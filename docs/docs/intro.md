@@ -6,10 +6,10 @@ title: Introduction
 # OpenMassSpec
 
 OpenMassSpec is a pure-Rust mass-spectrometry I/O stack. It reads native
-vendor acquisitions from Thermo Fisher, Bruker, and Waters instruments
-and emits standards-compliant mzML, Arrow record batches, or native
-Rust / Python data structures - without any vendor SDK, runtime, or
-binary blob.
+vendor acquisitions from Thermo Fisher, Bruker, Waters, Agilent, and
+SCIEX instruments and emits standards-compliant mzML, Arrow record
+batches, or native Rust / Python data structures - without any vendor
+SDK, runtime, or binary blob.
 
 ## What is in the box
 
@@ -22,6 +22,8 @@ binary blob.
 | `opentfraw`        | Thermo Finnigan `.raw` reader (Rust 2021, MSRV 1.75).    |
 | `opentimstdf`      | Bruker `.d/` (TDF) reader.                              |
 | `openwraw`         | Waters MassLynx `.raw/` reader.                          |
+| `openaraw`         | Agilent MassHunter `.d/` reader.                         |
+| `opensxraw`        | SCIEX legacy `.wiff`/`.wiff.scan` reader.                |
 
 ## Design goals
 

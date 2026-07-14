@@ -10,7 +10,8 @@ openmassspec-core = { path = "../OpenMassSpecCore" }
 
 The `all` feature pulls in every vendor. To trim binary size you can
 opt in to one vendor at a time: `features = ["thermo"]`,
-`features = ["bruker"]`, `features = ["waters"]`.
+`features = ["bruker"]`, `features = ["waters"]`,
+`features = ["agilent"]`, `features = ["sciex"]`.
 
 ## Convert a file to mzML
 

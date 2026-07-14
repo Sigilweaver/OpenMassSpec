@@ -4,29 +4,46 @@
 `path` and returns a `Detected { path, format }` if and only if the
 signature of a supported vendor matches. The detection rules are:
 
-| Vendor | Path kind | Signature                                                |
-| ------ | --------- | -------------------------------------------------------- |
-| Thermo | File      | Path ends in `.raw` (case-insensitive) **and** is a file. |
-| Bruker | Directory | Path ends in `.d/`, contains `analysis.tdf` and `analysis.tdf_bin`. |
-| Waters | Directory | Path ends in `.raw/`, contains `_HEADER.TXT`.            |
+| Vendor  | Path kind | Signature                                                        |
+| ------- | --------- | ----------------------------------------------------------------- |
+| Bruker  | Directory | Contains `analysis.tdf` **and** `analysis.tdf_bin`.               |
+| Agilent | Directory | Contains `AcqData/MSScan.bin`.                                    |
+| Waters  | Directory | Contains `_HEADER.TXT`.                                           |
+| Thermo  | File      | First 18 bytes match the Finnigan header (see below).             |
+| SCIEX   | File      | `.wiff` extension (case-insensitive) with a sibling `<name>.wiff.scan` file. |
 
-The Thermo and Waters check share the `.raw` suffix but differ by
-path kind: Thermo is a regular file, Waters is a bundle directory.
-Detection does **not** open the file or parse content - only the
-filename and (for directory formats) the presence of one or two
-required entries. This keeps detection cheap even for stat-heavy
-filesystems.
+For directories, the checks run in the order above (Bruker, then
+Agilent, then Waters) and stop at the first match. Bruker and Agilent
+bundles are both commonly named `<run>.d/`, so they are disambiguated
+by contents, not by the directory name - detection never inspects the
+extension for directory formats.
+
+For files, the checks run Thermo then SCIEX, and stop at the first
+match.
+
+**Thermo detection is content-based, not extension-based.** A `.raw`
+suffix is not sufficient (and not required): `detect_format` opens the
+file and checks whether bytes 2 through 17 equal the UTF-16LE string
+`Finnigan`, which is the Thermo Finnigan file signature. This is the
+one vendor whose detection reads file content; every other signature
+is a directory-entry or extension check, which keeps detection cheap
+even for stat-heavy filesystems.
 
 ## Edge cases
 
-- A `.raw` directory that does **not** contain `_HEADER.TXT` is
-  returned as `None`. We do not heuristically descend looking for
-  alternate Waters layouts.
-- A symlink to a `.raw` file is treated as a regular file; we do not
-  resolve through to its target before checking the suffix.
-- Casing: the suffix match is case-insensitive but the directory and
-  file names inside a Bruker / Waters bundle are checked exactly as
-  the vendor writes them (`analysis.tdf`, not `Analysis.TDF`).
+- A directory that does **not** match any of the Bruker / Agilent /
+  Waters content checks is returned as `None`, regardless of its name
+  or extension. We do not heuristically descend looking for alternate
+  bundle layouts.
+- A symlink to a Thermo `.raw` file is treated as a regular file; the
+  signature check reads through the link to the target's content.
+- A `.wiff` file with no sibling `.wiff.scan` file is **not** detected
+  as SCIEX - `detect_format` returns `None` even though the extension
+  matches, because the reader needs the paired scan file.
+- Casing: the SCIEX `.wiff` extension match is case-insensitive, but
+  directory-bundle entry names are checked exactly as the vendor
+  writes them (`analysis.tdf`, not `Analysis.TDF`; `AcqData`, not
+  `acqdata`).
 
 ## CLI behavior
 

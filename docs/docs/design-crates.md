@@ -1,6 +1,6 @@
 # Crate layout
 
-OpenMassSpec is split across five git repositories. Each repo can be
+OpenMassSpec is split across seven git repositories. Each repo can be
 released independently, but their version constraints in
 `OpenMassSpec/Cargo.toml` pin the combinations that have been validated
 together.
@@ -14,8 +14,10 @@ together.
 | `OpenTFRaw`      | `opentfraw`                                               |
 | `OpenTimsTDF`        | `opentimstdf`                                             |
 | `OpenWRaw`       | `openwraw`                                                |
+| `OpenARaw`       | `openaraw`                                                |
+| `OpenSXRaw`      | `opensxraw`                                               |
 
-## Why five repos and not one monorepo?
+## Why seven repos and not one monorepo?
 
 - Each vendor reader has its own conformance corpus, its own CHANGELOG,
   and its own release cadence. Bruker firmware ships new TDF columns
@@ -36,11 +38,13 @@ feature:
 
 ```toml
 [features]
-default = ["all"]
-all     = ["thermo", "bruker", "waters", "arrow"]
+default = []
+all     = ["thermo", "bruker", "waters", "agilent", "sciex"]
 thermo  = ["dep:opentfraw"]
 bruker  = ["dep:opentimstdf"]
 waters  = ["dep:openwraw"]
+agilent = ["dep:openaraw"]
+sciex   = ["dep:opensxraw"]
 arrow   = ["openmassspec-core/arrow"]
 ```
 
