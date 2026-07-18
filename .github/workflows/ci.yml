@@ -1,8 +1,9 @@
 # CI for OpenMassSpec (umbrella).
 #
-# The workspace pulls openmassspec-core, opentfraw, opentimstdf, openwraw via
-# path = "../<repo>" dependencies, so CI must check out all five repos as
-# siblings. The matrix runs fmt + clippy + test on Ubuntu and macOS.
+# The workspace pulls openmassspec-core, opentfraw, opentimstdf, openwraw,
+# openaraw, and opensxraw from crates.io (registry versions pinned in
+# Cargo.toml), so only this repo needs to be checked out. The matrix runs
+# fmt + clippy + test on Ubuntu and macOS.
 
 name: CI
 

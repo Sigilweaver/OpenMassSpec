@@ -69,7 +69,7 @@ jobs:
           NAME=vendor2mzml-${{ github.ref_name }}-${{ matrix.label }}
           mkdir -p dist/$NAME
           cp target/${{ matrix.target }}/release/vendor2mzml dist/$NAME/
-          cp README.md LICENSE.md CHANGELOG.md dist/$NAME/ 2>/dev/null || true
+          cp README.md LICENSE CHANGELOG.md dist/$NAME/ 2>/dev/null || true
           tar -C dist -czf dist/$NAME.tar.gz $NAME
           shasum -a 256 dist/$NAME.tar.gz > dist/$NAME.tar.gz.sha256
 
@@ -80,7 +80,7 @@ jobs:
           $name = "vendor2mzml-${{ github.ref_name }}-${{ matrix.label }}"
           New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/vendor2mzml.exe" "dist/$name/"
-          foreach ($f in @("README.md","LICENSE.md","CHANGELOG.md")) {
+          foreach ($f in @("README.md","LICENSE","CHANGELOG.md")) {
             if (Test-Path $f) { Copy-Item $f "dist/$name/" }
           }
           Compress-Archive -Path "dist/$name/*" -DestinationPath "dist/$name.zip"
