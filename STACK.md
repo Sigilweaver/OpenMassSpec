@@ -7,7 +7,7 @@ Regenerate with `scripts/release-stack.sh --write-stack-md --apply`.
 
 | Component | Version | SHA |
 |-----------|---------|-----|
-| OpenMassSpec (umbrella) | 1.5.0 | `PENDING` |
+| OpenMassSpec (umbrella) | 1.5.0 | `24a8949` |
 | openmassspec-core | 1.2.0 | `5a913aa` |
 | opentfraw | 1.3.4 | `32d1d0a` |
 | opentimstdf | 1.3.0 | `f730431` |
