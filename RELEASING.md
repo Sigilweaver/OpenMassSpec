@@ -87,11 +87,28 @@ For **each** published Python package, before tagging:
 
 ## Release
 
-7. **Tag.** `scripts/release-stack.sh --name vX.Y.Z --tag --push --apply`
+7. **Confirm release-readiness (CI/audit).** `publish.yml` triggers
+   directly on `push: tags: ["v*"]` and cannot `needs:` a job defined in
+   `ci.yml` or `audit.yml` (GitHub Actions has no cross-workflow
+   `needs:`), so this has to be checked before the tag exists.
+   `scripts/release-stack.sh --tag --apply` runs
+   `scripts/check-release-ready.sh` automatically before it creates or
+   pushes the tag, and refuses to tag if CI or the audit workflow hasn't
+   run, is still in progress, or didn't succeed on the target commit. If
+   tagging by hand instead, run the same check yourself first:
+
+   ```sh
+   scripts/check-release-ready.sh [ref]   # defaults to HEAD
+   ```
+
+   The check is bypassable with `release-stack.sh ... --skip-release-check`
+   for exceptional cases; there's no equivalent bypass for a by-hand tag
+   other than skipping the script entirely.
+8. **Tag.** `scripts/release-stack.sh --name vX.Y.Z --tag --push --apply`
    (or tag `vX.Y.Z` by hand). `publish.yml` triggers on `v*` and runs:
    crate publish (`continue-on-error`), openmassspec-io wheels + sdist +
    publish, and the openmassspec metapackage build + publish.
-8. **Watch the run.** A transient wheel-leg failure will skip
+9. **Watch the run.** A transient wheel-leg failure will skip
    `publish-openmassspec-io` (it `needs: [build-wheels, build-sdist]`). This
    is almost always a runner network flake, not a real error. Fix:
 
@@ -106,7 +123,7 @@ For **each** published Python package, before tagging:
 
 ## Post-release
 
-9. **Verify on PyPI.** For each package, confirm the new version has an
+10. **Verify on PyPI.** For each package, confirm the new version has an
    sdist and that the sdist contains `LICENSE`:
 
    ```sh
@@ -122,12 +139,12 @@ For **each** published Python package, before tagging:
    PY
    ```
 
-10. **Update `versions.toml`** in the ops repo and commit
+11. **Update `versions.toml`** in the ops repo and commit
     (`versions: bump OpenMassSpec to X.Y.Z`).
 
 ## conda-forge (two-stage)
 
-11. The facade's recipe depends on the binding, so submit in order:
+12. The facade's recipe depends on the binding, so submit in order:
     - First `openmassspec-io` to `conda-forge/staged-recipes`. Wait for the
       feedstock to be created and the package to appear on the channel.
     - Then `openmassspec` (a `noarch: python` recipe whose `run` requirement

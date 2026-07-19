@@ -26,6 +26,9 @@
 #                       only the gate command is reported.
 #   --gate-with-corpus  Pass --with-corpus to the SpecLance gate. Implies
 #                       --gate-speclance.
+#   --skip-release-check  Bypass the CI/audit release-readiness check
+#                       (scripts/check-release-ready.sh) that otherwise
+#                       runs automatically before tagging under --apply.
 #   --help              Show this help.
 #
 # Exit codes:
@@ -34,6 +37,8 @@
 #   2 dirty working tree in one of the repos
 #   3 missing sibling repo
 #   4 SpecLance truth-test gate failed (under --gate-speclance --apply)
+#   5 release-readiness check failed (CI/audit not green; under --apply,
+#     unless --skip-release-check)
 set -euo pipefail
 
 # Locations - this script lives in OpenMassSpec/scripts/.
@@ -81,6 +86,7 @@ DO_APPLY=0
 WRITE_STACK_MD=0
 DO_GATE=0
 GATE_WITH_CORPUS=0
+SKIP_RELEASE_CHECK=0
 
 usage() {
     sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'
@@ -95,6 +101,7 @@ while [ $# -gt 0 ]; do
         --write-stack-md) WRITE_STACK_MD=1; shift ;;
         --gate-speclance) DO_GATE=1; shift ;;
         --gate-with-corpus) DO_GATE=1; GATE_WITH_CORPUS=1; shift ;;
+        --skip-release-check) SKIP_RELEASE_CHECK=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) echo "Unknown flag: $1" >&2; usage >&2; exit 1 ;;
     esac
@@ -231,6 +238,26 @@ if [ "$DO_GATE" -eq 1 ]; then
         echo "[ok] SpecLance truth-test gate green" >&2
     else
         echo "[dry-run] would run gate: ${gate_cmd[*]}" >&2
+    fi
+fi
+
+# Refuse to tag a commit unless CI and audit are both green for it.
+# publish.yml cannot `needs:` a job in a separate workflow file, so this
+# is enforced here, before the tag exists, rather than inside
+# publish.yml. Runs automatically under --apply; --skip-release-check
+# bypasses it for exceptional cases.
+if [ "$DO_TAG" -eq 1 ]; then
+    if [ "$SKIP_RELEASE_CHECK" -eq 1 ]; then
+        echo "[warn] skipping release-readiness check (--skip-release-check)" >&2
+    elif [ "$DO_APPLY" -eq 1 ]; then
+        echo "[check] running: $SCRIPT_DIR/check-release-ready.sh" >&2
+        if ! "$SCRIPT_DIR/check-release-ready.sh" >&2; then
+            echo "[error] release-readiness check failed; refusing to tag" >&2
+            exit 5
+        fi
+        echo "[ok] release-readiness check passed" >&2
+    else
+        echo "[dry-run] would run: $SCRIPT_DIR/check-release-ready.sh" >&2
     fi
 fi
 
