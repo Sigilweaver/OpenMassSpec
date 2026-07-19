@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Bumped `mzdata` from 0.63.5 to 0.65.4 in `openmassspec-io-cli`, pulling
+  in `mzdata`'s own quick-xml 0.30 -> 0.41 upgrade
+  ([mobiusklein/mzdata#53](https://github.com/mobiusklein/mzdata/pull/53))
+  and clearing RUSTSEC-2026-0194/0195. No API changes needed on our side;
+  `mzml_reader.rs`'s usage of `MzMLReader`/`RawSpectrum`/`prelude` traits
+  is unaffected by the intervening 0.64.x/0.65.x releases. The `cargo
+  audit` CI job no longer needs to `--ignore` either advisory. Closes #4.
+
 ## [1.5.0] - 2026-07-18
 
 ### Added
