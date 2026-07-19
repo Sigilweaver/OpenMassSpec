@@ -2,8 +2,11 @@
 #
 # The workspace pulls openmassspec-core, opentfraw, opentimstdf, openwraw,
 # openaraw, and opensxraw from crates.io (registry versions pinned in
-# Cargo.toml), so only this repo needs to be checked out. The matrix runs
-# fmt + clippy + test on Ubuntu and macOS.
+# Cargo.toml), so only this repo needs to be checked out. The rust and
+# python matrices mirror release.yml/publish.yml's wheel-build matrix
+# (Ubuntu, macOS, Windows) per CI_STANDARDS.md - every OS a wheel/binary
+# ships for gets exercised here. fmt/clippy are OS-independent and only
+# run once, on Ubuntu.
 
 name: CI
 
@@ -27,6 +30,13 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
+          - windows-latest
+    defaults:
+      run:
+        # windows-latest defaults to pwsh; the steps below (and Swatinem/
+        # rust-cache internals) assume POSIX shell syntax. Git-for-Windows
+        # ships a real bash, so this works uniformly across all three OSes.
+        shell: bash
     steps:
       - name: Checkout OpenMassSpec
         uses: actions/checkout@v4
@@ -39,10 +49,14 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      # fmt/clippy results are OS-independent; only run them once to avoid
+      # tripling redundant CI time (org standard, see CI_STANDARDS.md).
       - name: cargo fmt
+        if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
+        if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
       - name: cargo test
@@ -83,12 +97,22 @@ jobs:
         run: cargo check --workspace --all-features
 
   python:
-    name: Python smoke (${{ matrix.python }})
-    runs-on: ubuntu-latest
+    name: Python smoke (${{ matrix.os }} / ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
         python: ["3.9", "3.12"]
+    defaults:
+      run:
+        # windows-latest defaults to pwsh; the steps below rely on POSIX
+        # shell syntax. Git-for-Windows ships a real bash, so this works
+        # uniformly across all three OSes.
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -99,12 +123,20 @@ jobs:
       - name: Create venv
         run: |
           python -m venv .venv
-          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          if [ -f .venv/bin/activate ]; then
+            echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          else
+            # Windows venvs put scripts (incl. python.exe) in Scripts/, not bin/.
+            echo "$PWD/.venv/Scripts" >> "$GITHUB_PATH"
+          fi
           echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
       - name: Install maturin + pytest
         run: pip install 'maturin>=1.5,<2' pytest pyarrow numpy
       - name: Build and install openmassspec-io
         working-directory: crates/openmassspec-io-py
+        # maturin supplies the pyo3 extension-module linker flags for us
+        # (incl. the macOS -undefined dynamic_lookup / Windows import-lib
+        # handling); no bare `cargo build`/`cargo test` runs in this job.
         run: maturin develop --release --features pyo3/extension-module
       - name: Install openmassspec metapackage
         run: pip install ./python
