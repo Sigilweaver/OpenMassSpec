@@ -7,17 +7,17 @@ Apache Arrow bridge, and the cross-vendor conformance harness.
 
 - Crate: [Sigilweaver/OpenMassSpecCore](https://github.com/Sigilweaver/OpenMassSpecCore)
 - License: Apache-2.0
-- MSRV: 1.75
+- MSRV: 1.85
 - `#![forbid(unsafe_code)]`
 
 ## Install
 
 ```toml
 [dependencies]
-openmassspec-core = "0.1"
+openmassspec-core = "1"
 
 # Optional: zero-copy Arrow RecordBatch builder.
-openmassspec-core = { version = "0.1", features = ["arrow"] }
+openmassspec-core = { version = "1", features = ["arrow"] }
 ```
 
 ## The `SpectrumSource` trait
@@ -39,7 +39,7 @@ pub trait SpectrumSource {
         -> Box<dyn Iterator<Item = ChromatogramRecord> + 'a> {
         Box::new(std::iter::empty())
     }
-    fn spectrum_count(&self) -> Option<usize> { None }
+    fn spectrum_count_hint(&self) -> Option<usize> { None }
 }
 ```
 
@@ -107,15 +107,17 @@ runs this harness on any vendor input or pre-existing mzML.
 
 ```rust
 # #[cfg(feature = "arrow")]
-# fn _doc() -> arrow_array::RecordBatch {
+# fn _doc() -> Result<arrow_array::RecordBatch, arrow_schema::ArrowError> {
 use openmassspec_core::arrow::SpectrumBatchBuilder;
 
-let mut b = SpectrumBatchBuilder::new();
+// Pass the source's mobility_array_kind (None for instruments without
+// ion mobility); it applies to every row in the batch.
+let mut b = SpectrumBatchBuilder::new(None);
 for s in /* SpectrumSource iter_spectra */ std::iter::empty() {
     b.push(&s);
 }
-let batch = b.finish();
-# batch
+let batch = b.finish()?;
+# Ok(batch)
 # }
 ```
 
