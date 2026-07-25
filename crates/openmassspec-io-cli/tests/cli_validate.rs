@@ -25,10 +25,12 @@ fn make_metadata() -> RunMetadata {
         source_file_format: CvTerm::new("MS:1000563", "Thermo RAW format"),
         native_id_format: CvTerm::new("MS:1000768", "Thermo nativeID format"),
         instrument: CvTerm::new("MS:1000031", "instrument model"),
+        instrument_serial_number: None,
         software_name: "openmassspec-io-cli-test".into(),
         software_version: "0.0.0".into(),
         start_timestamp: None,
         mobility_array_kind: None,
+        analyzers: Vec::new(),
     }
 }
 
@@ -50,6 +52,7 @@ fn make_record(index: usize, scan: u32, ms_level: u32, rt_sec: f64) -> SpectrumR
             )),
             activation: Some(openmassspec_core::Activation::HCD),
             analyzer: None,
+            ccs: None,
         })
     } else {
         None

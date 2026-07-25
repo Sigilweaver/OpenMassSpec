@@ -62,6 +62,7 @@ fn spectrum_to_record(stream_index: usize, s: RawSpectrum) -> SpectrumRecord {
             precursor_native_id: None,
             activation: None,
             analyzer: None,
+            ccs: None,
         }
     });
 
