@@ -15,6 +15,35 @@ from pathlib import Path
 import openmassspec
 import pytest
 
+# `detect()` forwards to `openmassspec_io.detect_format`, which - like the
+# Rust `detect_format` it binds - verifies content, not just extension, for
+# Thermo and Shimadzu. These are the exact byte sequences
+# `crates/openmassspec-io/src/lib.rs`'s `is_thermo_raw`/
+# `is_shimadzu_labsolutions` check for; see `docs/docs/format-detection.md`.
+FINNIGAN_HEADER = bytes(
+    [
+        0x01,
+        0xA1,
+        0x46,
+        0x00,
+        0x69,
+        0x00,
+        0x6E,
+        0x00,
+        0x6E,
+        0x00,
+        0x69,
+        0x00,
+        0x67,
+        0x00,
+        0x61,
+        0x00,
+        0x6E,
+        0x00,
+    ]
+)
+CFBF_MAGIC = bytes([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])
+
 
 def test_version_string():
     assert isinstance(openmassspec.__version__, str)
@@ -34,14 +63,27 @@ def test_vendors_tuple():
 
 def test_detect_thermo_file(tmp_path: Path):
     f = tmp_path / "sample.raw"
-    f.write_bytes(b"")
+    f.write_bytes(FINNIGAN_HEADER)
     assert openmassspec.detect(f) == "thermo"
+
+
+def test_detect_thermo_file_without_finnigan_magic_is_none(tmp_path: Path):
+    """A bare `.raw` extension is not enough - content must match too.
+
+    Regression test for the bug in #19: the old hand-rolled `detect()`
+    trusted the `.raw` extension alone and never checked the Finnigan
+    magic bytes the way the canonical Rust `detect_format` does.
+    """
+    f = tmp_path / "sample.raw"
+    f.write_bytes(b"not actually a thermo file")
+    assert openmassspec.detect(f) is None
 
 
 def test_detect_bruker_d(tmp_path: Path):
     d = tmp_path / "sample.d"
     d.mkdir()
     (d / "analysis.tdf").write_bytes(b"")
+    (d / "analysis.tdf_bin").write_bytes(b"")
     assert openmassspec.detect(d) == "bruker"
 
 
@@ -69,14 +111,28 @@ def test_detect_sciex_wiff(tmp_path: Path):
 
 def test_detect_shimadzu_lcd(tmp_path: Path):
     f = tmp_path / "sample.lcd"
-    f.write_bytes(b"")
+    f.write_bytes(CFBF_MAGIC)
     assert openmassspec.detect(f) == "shimadzu"
 
 
 def test_detect_shimadzu_qgd(tmp_path: Path):
     f = tmp_path / "sample.qgd"
-    f.write_bytes(b"")
+    f.write_bytes(CFBF_MAGIC)
     assert openmassspec.detect(f) == "shimadzu"
+
+
+def test_detect_shimadzu_lcd_without_cfbf_magic_is_none(tmp_path: Path):
+    """A bare `.lcd`/`.qgd` extension is not enough - content must match too.
+
+    Regression test for the bug in #19: the old hand-rolled `detect()`
+    trusted the extension alone for Shimadzu and never checked the
+    CFBF/OLE2 magic bytes the way the canonical Rust `detect_format`
+    does - so it would have wrongly called a renamed/garbage file
+    Shimadzu.
+    """
+    f = tmp_path / "sample.lcd"
+    f.write_bytes(b"not a real container")
+    assert openmassspec.detect(f) is None
 
 
 def test_detect_wiff_without_scan_is_none(tmp_path: Path):
@@ -130,7 +186,7 @@ def test_open_run_thermo_dispatch(monkeypatch, tmp_path: Path):
     import types
 
     f = tmp_path / "sample.raw"
-    f.write_bytes(b"")
+    f.write_bytes(FINNIGAN_HEADER)
     calls: list[str] = []
 
     fake = types.ModuleType("opentfraw")
@@ -148,6 +204,7 @@ def test_open_run_bruker_dispatch(monkeypatch, tmp_path: Path):
     d = tmp_path / "sample.d"
     d.mkdir()
     (d / "analysis.tdf").write_bytes(b"")
+    (d / "analysis.tdf_bin").write_bytes(b"")
     calls: list[str] = []
 
     fake = types.ModuleType("opentimstdf")
@@ -217,7 +274,7 @@ def test_open_run_shimadzu_dispatch(monkeypatch, tmp_path: Path):
     import types
 
     f = tmp_path / "sample.lcd"
-    f.write_bytes(b"")
+    f.write_bytes(CFBF_MAGIC)
     calls: list[str] = []
 
     fake = types.ModuleType("openszraw")

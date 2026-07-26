@@ -30,8 +30,10 @@ Top-level helpers fall into two layers:
 
 * ``detect_format``, ``to_mzml``, ``iter_spectra`` are re-exports from
   ``openmassspec_io`` - the vendor-agnostic reader.
-* ``detect``, ``open_run`` use only structural checks and dispatch to
-  the vendor extension that matches the input path (requires the
+* ``detect``, ``open_run`` delegate to ``detect_format`` (there is a
+  single, canonical implementation of the structural checks, in
+  ``openmassspec-io``'s Rust ``detect_format``) and dispatch to the
+  vendor extension that matches the input path (requires the
   corresponding extra).
 """
 
@@ -81,37 +83,28 @@ def detect(path: str | os.PathLike[str]) -> Optional[str]:
     """Return ``"thermo"``, ``"bruker"``, ``"waters"``, ``"agilent"``,
     ``"sciex"``, ``"shimadzu"`` or ``None`` for *path*.
 
-    The check is purely structural (extension + sentinel files); no vendor
-    reader needs to be importable.
+    Delegates to :func:`detect_format` (the ``openmassspec_io`` Rust
+    binding), which is the single, canonical implementation of every
+    vendor's structural signature - extension and/or sentinel files,
+    plus, where applicable, content checks such as Shimadzu's CFBF/OLE2
+    magic bytes or Thermo's "Finnigan" marker. This function used to
+    reimplement those checks by hand and had drifted from the Rust
+    side (it never verified Shimadzu's magic bytes the way the Rust
+    side does, and matched a wider, undocumented set of Waters sentinel
+    files than the canonical ``_HEADER.TXT`` check); it now forwards to
+    ``detect_format`` so there is one source of truth. See
+    ``crates/openmassspec-io/src/lib.rs``'s ``detect_format`` (and
+    ``docs/docs/format-detection.md``) for the exact per-vendor rules.
+
+    The check is purely structural; no vendor reader needs to be
+    importable.
     """
-    p = Path(path)
-    if not p.exists():
-        return None
-    if p.is_file():
-        if p.suffix.lower() == ".raw":
-            return "thermo"
-        # SCIEX: a .wiff file with its paired .wiff.scan alongside.
-        if p.suffix.lower() == ".wiff" and Path(str(p) + ".scan").is_file():
-            return "sciex"
-        # Shimadzu: self-contained, no sibling file to check - extension
-        # alone (matches this function's existing "purely structural"
-        # precedent; the Rust-side detect_format additionally verifies
-        # the CFBF/OLE2 magic bytes, see openmassspec-io's detect_format).
-        if p.suffix.lower() in (".qgd", ".lcd"):
-            return "shimadzu"
-    if p.is_dir():
-        suffix = p.suffix.lower()
-        # Bruker and Agilent both use a .d directory; disambiguate by contents.
-        if suffix == ".d" and (p / "analysis.tdf").is_file():
-            return "bruker"
-        if (p / "AcqData" / "MSScan.bin").is_file():
-            return "agilent"
-        if suffix == ".raw" and any(
-            (p / name).exists()
-            for name in ("_FUNCTNS.INF", "_extern.inf", "_HEADER.TXT")
-        ):
-            return "waters"
-    return None
+    if detect_format is None:
+        raise ImportError(
+            "openmassspec_io is required for detect(); it is a hard "
+            "dependency of the openmassspec base install"
+        )
+    return detect_format(Path(path))
 
 
 def open_run(path: str | os.PathLike[str]):
