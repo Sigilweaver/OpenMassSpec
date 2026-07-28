@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Bumped the workspace `rust-version` (and the MSRV CI job) from 1.88 to
+  1.95. `opentimstdf`'s `rusqlite ^0.40` dependency (pulled in only by
+  the optional `bruker`/`all` feature) now resolves to
+  `libsqlite3-sys 0.38.x`, whose bundled-build path uses the
+  `cfg_select!` macro stabilized in Rust 1.95 - the MSRV check job was
+  failing on `main` as a result. No older `libsqlite3-sys` release
+  compatible with `rusqlite ^0.40` predates this, and downgrading
+  `opentimstdf`'s own `rusqlite` pin or dropping the `bundled` feature
+  (trading it for a system-sqlite3 build dependency on every platform)
+  were judged worse tradeoffs than raising the floor. Default-feature
+  builds (no Bruker support) were never actually affected; this only
+  changes the declared floor for the `bruker`/`all` feature combination
+  the `--all-features` CI job tests.
 - Python's `openmassspec.detect()`/`open_run()` now delegate to the
   Rust `openmassspec_io.detect_format` binding instead of
   reimplementing the vendor structural checks by hand. The two

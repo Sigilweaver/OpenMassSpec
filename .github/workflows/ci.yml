@@ -89,13 +89,13 @@ jobs:
           done
 
   msrv:
-    name: MSRV check (1.88)
+    name: MSRV check (1.95)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.88"
+          toolchain: "1.95"
       - uses: Swatinem/rust-cache@v2
       - name: cargo check (MSRV)
         run: cargo check --workspace --all-features
