@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # release-stack.sh - coordinated stack release helper for OpenMassSpec.
 #
-# Reads pinned versions across the five-repo stack (this repo +
-# OpenMassSpecCore, OpenTFRaw, OpenTimsTDF, OpenWRaw), emits a release-notes
-# draft aggregated from each repo's CHANGELOG.md, and optionally creates
-# and pushes an annotated umbrella SemVer tag on this repo.
+# Reads pinned versions across the eight-repo stack (this repo +
+# OpenMassSpecCore, OpenTFRaw, OpenTimsTDF, OpenWRaw, OpenARaw, OpenSXRaw,
+# OpenSZRaw), emits a release-notes draft aggregated from each repo's
+# CHANGELOG.md, and optionally creates and pushes an annotated umbrella
+# SemVer tag on this repo.
 #
 # Usage:
 #   scripts/release-stack.sh                       # dry-run, notes to stdout
