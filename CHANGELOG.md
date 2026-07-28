@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `vendor2mzml`'s unrecognized-format error message and the `convert`
+  subcommand's `input` help text now list all six supported vendors
+  (Agilent, SCIEX, and Shimadzu were missing from both). `scripts/
+  release-stack.sh`'s header comment now describes the current
+  eight-repo stack instead of the stale five-repo one from before
+  OpenARaw/OpenSXRaw/OpenSZRaw landed. Text-only change, no behavior
+  change. Fix contributed by @Nabejo. Closes #18.
+
 ## [1.5.2] - 2026-07-20
 
 ### Security

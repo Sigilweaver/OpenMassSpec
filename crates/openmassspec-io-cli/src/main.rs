@@ -47,8 +47,9 @@ enum Cmd {
 
 #[derive(Args, Debug)]
 struct ConvertArgs {
-    /// Input path: a `.raw` file (Thermo) or a `.d/` / `.raw/` bundle
-    /// directory (Bruker, Waters).
+    /// Input path: a `.raw` file (Thermo), a `.wiff` file (SCIEX), a
+    /// `.qgd` / `.lcd` file (Shimadzu), or a `.d/` / `.raw/` bundle
+    /// directory (Bruker, Agilent, Waters).
     input: PathBuf,
     /// Output mzML path. Use a `.mzML.gz` extension to write gzipped
     /// output (auto-detected from the file name).
@@ -128,7 +129,9 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
             "error: {} does not look like a supported vendor format",
             args.input.display()
         );
-        eprintln!("  (recognized: Thermo .raw, Bruker .d/, Waters .raw/)");
+        eprintln!(
+            "  (recognized: Thermo .raw, Bruker .d/, Waters .raw/, Agilent .d/, SCIEX .wiff, Shimadzu .qgd/.lcd)"
+        );
         return ExitCode::from(1);
     };
     eprintln!(
