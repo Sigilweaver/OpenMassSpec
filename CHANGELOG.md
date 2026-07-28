@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Python's `openmassspec.detect()`/`open_run()` now delegate to the
+  Rust `openmassspec_io.detect_format` binding instead of
+  reimplementing the vendor structural checks by hand. The two
+  implementations had drifted: the Python side never checked
+  Shimadzu's CFBF/OLE2 magic bytes the way `detect_format` does (so a
+  renamed/garbage `.qgd`/`.lcd` file was wrongly reported as
+  Shimadzu), and it matched a wider, undocumented set of Waters
+  sentinel files (`_FUNCTNS.INF`, `_extern.inf`, `_HEADER.TXT`) than
+  the canonical `_HEADER.TXT`-only check. There is now a single source
+  of truth for format detection. Fixed by @Nabejo. Closes #19.
 - `vendor2mzml`'s unrecognized-format error message and the `convert`
   subcommand's `input` help text now list all six supported vendors
   (Agilent, SCIEX, and Shimadzu were missing from both). `scripts/
