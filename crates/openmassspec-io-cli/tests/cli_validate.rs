@@ -31,6 +31,8 @@ fn make_metadata() -> RunMetadata {
         start_timestamp: None,
         mobility_array_kind: None,
         analyzers: Vec::new(),
+        acquisition_software_name: None,
+        acquisition_software_version: None,
     }
 }
 
