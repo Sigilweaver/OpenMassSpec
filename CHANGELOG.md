@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Adapted the `cli_validate` test fixture's `RunMetadata` literal to
+  `openmassspec-core` 1.4.0's new `acquisition_software_name`/
+  `acquisition_software_version` fields (`None, None` - synthetic
+  fixture, no real vendor data to source a value from). Bumped the
+  stale `openmassspec-core = "1.2.0"` workspace floor to `"1.4.0"`, and
+  the six vendor-crate floors (`opentfraw`, `opentimstdf`, `openwraw`,
+  `openaraw`, `opensxraw`, `openszraw`) to the releases that actually
+  compile against it, now that all six have published their own
+  core-1.4.0 adaptations. (Sigilweaver/OpenMassSpec#22)
 - Bumped the workspace `rust-version` (and the MSRV CI job) from 1.88 to
   1.95. `opentimstdf`'s `rusqlite ^0.40` dependency (pulled in only by
   the optional `bruker`/`all` feature) now resolves to
