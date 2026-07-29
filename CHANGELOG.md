@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-07-29
+
 ### Fixed
 
 - Adapted the `cli_validate` test fixture's `RunMetadata` literal to
