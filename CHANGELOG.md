@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Wired real corpus fixtures into CI for `crates/openmassspec-io/tests/vendor2mzml.rs`
+  and `crates/openmassspec-io-cli/tests/cli_centroid.rs`, which previously
+  always skipped in CI because they checked hardcoded sibling-checkout
+  paths (e.g. `../../../SpecLance/corpus/...`) that never exist there.
+  `.github/workflows/ci.yml`'s `rust` job now downloads the same six
+  small Thermo/Waters/Bruker/Shimadzu (PRIDE, MetaboLights, and MassIVE)
+  fixtures already used elsewhere in this suite-wide effort into a
+  gitignored repo-root `corpus/` dir (Linux leg only, to avoid tripling
+  the ~140 MB download across the 3-OS matrix), and both test files now
+  look there first, falling back to the old sibling-checkout paths for
+  local dev. (Sigilweaver/OpenMassSpec#24)
+
 ## [1.5.3] - 2026-07-29
 
 ### Fixed

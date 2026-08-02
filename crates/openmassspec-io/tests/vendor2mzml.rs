@@ -7,6 +7,77 @@
 use std::fs;
 use std::path::PathBuf;
 
+/// Returns the first candidate that exists on disk, or the first
+/// candidate (the repo-root `corpus/` location) if none do - so the
+/// existing `!input.exists()` skip-and-log check in `smoke`/
+/// `centroid_smoke`/`stream_matches_collect` still prints a sensible
+/// path when nothing is present.
+///
+/// Candidates are always given repo-root-first, sibling-checkout-second:
+/// the repo-root `corpus/` path is the one `.github/workflows/ci.yml`'s
+/// "Download corpus fixtures for smoke tests" step populates (Linux
+/// only - see Sigilweaver/OpenMassSpec#24); the sibling-checkout path is
+/// a local-dev fallback for machines with the relevant corpus checked
+/// out next to this repo.
+fn first_existing(candidates: &[PathBuf]) -> PathBuf {
+    candidates
+        .iter()
+        .find(|p| p.exists())
+        .cloned()
+        .unwrap_or_else(|| candidates[0].clone())
+}
+
+fn manifest_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+fn thermo_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir().join("../../corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw"),
+        manifest_dir()
+            .join("../../../SpecLance/corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw"),
+    ])
+}
+
+fn waters_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir().join("../../corpus/waters/molecular_mass_P15_01.raw"),
+        manifest_dir().join("../../../SpecLance/corpus/waters/PXD058812/molecular_mass_P15_01.raw"),
+    ])
+}
+
+fn bruker_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir().join("../../corpus/bruker/NQO1-F107C_coi-N2-P_200-0C_3996.d"),
+        manifest_dir().join(
+            "../../../OpenTimsTDF/re/artifacts/cache/pride/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d",
+        ),
+    ])
+}
+
+fn shimadzu_qgd_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir().join("../../corpus/shimadzu/PXD034978/49_27a__8122021_11.qgd"),
+        manifest_dir().join("../../../Data/SZRaw/PXD034978/49_27a__8122021_11.qgd"),
+    ])
+}
+
+fn shimadzu_lcd_ittof_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir()
+            .join("../../corpus/shimadzu/MTBLS432/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd"),
+        manifest_dir()
+            .join("../../../Data/SZRaw/MTBLS432/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd"),
+    ])
+}
+
+fn shimadzu_lcd_qtof_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir().join("../../corpus/shimadzu/MSV000084197/20190607_NM16.lcd"),
+        manifest_dir().join("../../../Data/SZRaw/MSV000084197/20190607_NM16.lcd"),
+    ])
+}
+
 /// Derive a filesystem-safe, per-input-file component for temp output
 /// names. Needed because several vendors (e.g. Shimadzu's three on-disk
 /// variants) share one `VendorFormat::name()`, so `name()` + pid alone
@@ -54,44 +125,32 @@ fn smoke(input: PathBuf) {
 
 #[test]
 fn thermo_smoke() {
-    smoke(PathBuf::from(
-        "../../../SpecLance/corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw",
-    ));
+    smoke(thermo_fixture());
 }
 
 #[test]
 fn waters_smoke() {
-    smoke(PathBuf::from(
-        "../../../SpecLance/corpus/waters/PXD058812/molecular_mass_P15_01.raw",
-    ));
+    smoke(waters_fixture());
 }
 
 #[test]
 fn bruker_smoke() {
-    smoke(PathBuf::from(
-        "../../../OpenTimsTDF/re/artifacts/cache/pride/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d",
-    ));
+    smoke(bruker_fixture());
 }
 
 #[test]
 fn shimadzu_qgd_smoke() {
-    smoke(PathBuf::from(
-        "../../../Data/SZRaw/PXD034978/49_27a__8122021_11.qgd",
-    ));
+    smoke(shimadzu_qgd_fixture());
 }
 
 #[test]
 fn shimadzu_lcd_ittof_smoke() {
-    smoke(PathBuf::from(
-        "../../../Data/SZRaw/MTBLS432/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd",
-    ));
+    smoke(shimadzu_lcd_ittof_fixture());
 }
 
 #[test]
 fn shimadzu_lcd_qtof_smoke() {
-    smoke(PathBuf::from(
-        "../../../Data/SZRaw/MSV000084197/20190607_NM16.lcd",
-    ));
+    smoke(shimadzu_lcd_qtof_fixture());
 }
 
 /// After `convert_to_mzml_centroided`, no spectrum in the output should
@@ -126,32 +185,24 @@ fn centroid_smoke(input: PathBuf) {
 
 #[test]
 fn thermo_centroid_smoke() {
-    centroid_smoke(PathBuf::from(
-        "../../../SpecLance/corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw",
-    ));
+    centroid_smoke(thermo_fixture());
 }
 
 #[test]
 fn waters_centroid_smoke() {
-    centroid_smoke(PathBuf::from(
-        "../../../SpecLance/corpus/waters/PXD058812/molecular_mass_P15_01.raw",
-    ));
+    centroid_smoke(waters_fixture());
 }
 
 #[test]
 fn bruker_centroid_smoke() {
-    centroid_smoke(PathBuf::from(
-        "../../../OpenTimsTDF/re/artifacts/cache/pride/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d",
-    ));
+    centroid_smoke(bruker_fixture());
 }
 
 #[test]
 fn shimadzu_centroid_smoke() {
     // The QTOF variant is already centroid; MS1000127 should still be
     // present (pass-through), same invariant as the other vendors' tests.
-    centroid_smoke(PathBuf::from(
-        "../../../Data/SZRaw/MSV000084197/20190607_NM16.lcd",
-    ));
+    centroid_smoke(shimadzu_lcd_qtof_fixture());
 }
 
 /// `stream()`/`metadata_only()` must agree with `collect()` on both the
@@ -191,28 +242,20 @@ fn stream_matches_collect(input: PathBuf) {
 
 #[test]
 fn thermo_stream_matches_collect() {
-    stream_matches_collect(PathBuf::from(
-        "../../../SpecLance/corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw",
-    ));
+    stream_matches_collect(thermo_fixture());
 }
 
 #[test]
 fn waters_stream_matches_collect() {
-    stream_matches_collect(PathBuf::from(
-        "../../../SpecLance/corpus/waters/PXD058812/molecular_mass_P15_01.raw",
-    ));
+    stream_matches_collect(waters_fixture());
 }
 
 #[test]
 fn bruker_stream_matches_collect() {
-    stream_matches_collect(PathBuf::from(
-        "../../../OpenTimsTDF/re/artifacts/cache/pride/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d",
-    ));
+    stream_matches_collect(bruker_fixture());
 }
 
 #[test]
 fn shimadzu_stream_matches_collect() {
-    stream_matches_collect(PathBuf::from(
-        "../../../Data/SZRaw/PXD034978/49_27a__8122021_11.qgd",
-    ));
+    stream_matches_collect(shimadzu_qgd_fixture());
 }

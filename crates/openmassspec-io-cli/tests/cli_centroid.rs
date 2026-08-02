@@ -11,7 +11,21 @@ fn bin_path() -> PathBuf {
 }
 
 fn thermo_fixture() -> PathBuf {
-    PathBuf::from("../../../SpecLance/corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw")
+    // Repo-root `corpus/` first (populated by ci.yml's "Download corpus
+    // fixtures for smoke tests" step, Linux only - see
+    // Sigilweaver/OpenMassSpec#24); old sibling-checkout path as a
+    // local-dev fallback.
+    let candidates = [
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw"),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../SpecLance/corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw"),
+    ];
+    candidates
+        .iter()
+        .find(|p| p.exists())
+        .cloned()
+        .unwrap_or_else(|| candidates[0].clone())
 }
 
 #[test]

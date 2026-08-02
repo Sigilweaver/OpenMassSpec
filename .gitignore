@@ -19,3 +19,8 @@ docs-site/.docusaurus/
 # Working-name reminder, kept out of history
 RENAME-TBD.md
 python/build/
+
+# Corpus fixtures for the vendor2mzml/cli_centroid smoke tests, fetched
+# on demand by .github/workflows/ci.yml (see Sigilweaver/OpenMassSpec#24)
+# or by hand for local dev - not redistributed through this repo.
+/corpus/

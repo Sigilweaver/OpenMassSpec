@@ -63,6 +63,62 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
+      # Populates repo-root corpus/ with the six small vendor fixtures
+      # crates/openmassspec-io/tests/vendor2mzml.rs and
+      # crates/openmassspec-io-cli/tests/cli_centroid.rs look for, so
+      # those tests exercise a real decode path here instead of always
+      # skipping - see Sigilweaver/OpenMassSpec#24. Combined the six
+      # fixtures are ~140 MB (dominated by the ~90 MB Bruker bundle), so
+      # (matching the existing OS-independent-checks convention above,
+      # and precedent in OpenTimsTDF's own CI for the same Bruker
+      # fixture) this only runs on the ubuntu-latest leg; macOS/Windows
+      # continue to skip these six tests as they do today.
+      - name: Download corpus fixtures for smoke tests
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          set -e
+          mkdir -p corpus/thermo corpus/waters corpus/bruker \
+            corpus/shimadzu/PXD034978 corpus/shimadzu/MTBLS432 corpus/shimadzu/MSV000084197
+
+          # Thermo (PXD068962, PRIDE, CC0)
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
+            -o corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD068962/insource-CID.raw"
+
+          # Waters (PXD058812, PRIDE, CC0) - zipped bundle directory
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" -o waters.raw.zip \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/05/PXD058812/molecular_mass_P15_01.raw.zip"
+          unzip -q -d corpus/waters waters.raw.zip
+          rm waters.raw.zip
+          test -f corpus/waters/molecular_mass_P15_01.raw/_HEADER.TXT
+
+          # Bruker (PXD036417, PRIDE, CC0) - zipped bundle directory, ~90 MB
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" -o bruker.d.zip \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/11/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d.zip"
+          unzip -q -d corpus/bruker bruker.d.zip
+          rm bruker.d.zip
+          test -f corpus/bruker/NQO1-F107C_coi-N2-P_200-0C_3996.d/analysis.tdf
+          test -f corpus/bruker/NQO1-F107C_coi-N2-P_200-0C_3996.d/analysis.tdf_bin
+
+          # Shimadzu QGD (PXD034978, PRIDE, CC0)
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
+            -o corpus/shimadzu/PXD034978/49_27a__8122021_11.qgd \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/08/PXD034978/49_27a__8122021_11.qgd"
+
+          # Shimadzu LCD, IT-TOF variant (MTBLS432, MetaboLights/EBI)
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
+            -o "corpus/shimadzu/MTBLS432/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd" \
+            "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS432/FILES/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd"
+
+          # Shimadzu LCD, QTOF variant (MSV000084197, MassIVE, CC0) - via
+          # the HTTPS download endpoint; the FTP endpoint requires FTPS
+          # and isn't reliably reachable with plain curl in CI.
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
+            -o corpus/shimadzu/MSV000084197/20190607_NM16.lcd \
+            "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000084197%2Fraw%2F20190607_NM16.lcd"
+
+          du -sh corpus
+
       - name: cargo test
         run: cargo test --workspace --all-features
 
