@@ -78,6 +78,23 @@ fn shimadzu_lcd_qtof_fixture() -> PathBuf {
     ])
 }
 
+fn agilent_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir().join("../../corpus/agilent/180814-Sample19.d"),
+        manifest_dir().join("../../../OpenARaw/corpus/PXD030293/180814-Sample19.d"),
+    ])
+}
+
+/// The SCIEX reader needs the sibling `.wiff.scan` file present next to
+/// the `.wiff` path returned here, not just the path itself - see the
+/// download step in ci.yml, which fetches both.
+fn sciex_fixture() -> PathBuf {
+    first_existing(&[
+        manifest_dir().join("../../corpus/sciex/PXD022088/Rcor2KOESC1.wiff"),
+        manifest_dir().join("../../../OpenSXRaw/corpus/PXD022088/Rcor2KOESC1.wiff"),
+    ])
+}
+
 /// Derive a filesystem-safe, per-input-file component for temp output
 /// names. Needed because several vendors (e.g. Shimadzu's three on-disk
 /// variants) share one `VendorFormat::name()`, so `name()` + pid alone
@@ -153,6 +170,16 @@ fn shimadzu_lcd_qtof_smoke() {
     smoke(shimadzu_lcd_qtof_fixture());
 }
 
+#[test]
+fn agilent_smoke() {
+    smoke(agilent_fixture());
+}
+
+#[test]
+fn sciex_smoke() {
+    smoke(sciex_fixture());
+}
+
 /// After `convert_to_mzml_centroided`, no spectrum in the output should
 /// still be tagged profile mode - every profile spectrum was centroided,
 /// and every already-centroid spectrum passed through unchanged. This
@@ -203,6 +230,16 @@ fn shimadzu_centroid_smoke() {
     // The QTOF variant is already centroid; MS1000127 should still be
     // present (pass-through), same invariant as the other vendors' tests.
     centroid_smoke(shimadzu_lcd_qtof_fixture());
+}
+
+#[test]
+fn agilent_centroid_smoke() {
+    centroid_smoke(agilent_fixture());
+}
+
+#[test]
+fn sciex_centroid_smoke() {
+    centroid_smoke(sciex_fixture());
 }
 
 /// `stream()`/`metadata_only()` must agree with `collect()` on both the
@@ -258,4 +295,14 @@ fn bruker_stream_matches_collect() {
 #[test]
 fn shimadzu_stream_matches_collect() {
     stream_matches_collect(shimadzu_qgd_fixture());
+}
+
+#[test]
+fn agilent_stream_matches_collect() {
+    stream_matches_collect(agilent_fixture());
+}
+
+#[test]
+fn sciex_stream_matches_collect() {
+    stream_matches_collect(sciex_fixture());
 }

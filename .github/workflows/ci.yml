@@ -63,22 +63,24 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
-      # Populates repo-root corpus/ with the six small vendor fixtures
+      # Populates repo-root corpus/ with the eight small vendor fixtures
       # crates/openmassspec-io/tests/vendor2mzml.rs and
       # crates/openmassspec-io-cli/tests/cli_centroid.rs look for, so
       # those tests exercise a real decode path here instead of always
-      # skipping - see Sigilweaver/OpenMassSpec#24. Combined the six
-      # fixtures are ~140 MB (dominated by the ~90 MB Bruker bundle), so
-      # (matching the existing OS-independent-checks convention above,
-      # and precedent in OpenTimsTDF's own CI for the same Bruker
-      # fixture) this only runs on the ubuntu-latest leg; macOS/Windows
-      # continue to skip these six tests as they do today.
+      # skipping - see Sigilweaver/OpenMassSpec#24 (Thermo/Waters/Bruker/
+      # Shimadzu) and #25 (Agilent/SCIEX). Combined the fixtures are
+      # ~145 MB (dominated by the ~90 MB Bruker bundle), so (matching the
+      # existing OS-independent-checks convention above, and precedent in
+      # OpenTimsTDF's own CI for the same Bruker fixture) this only runs
+      # on the ubuntu-latest leg; macOS/Windows continue to skip these
+      # tests as they do today.
       - name: Download corpus fixtures for smoke tests
         if: matrix.os == 'ubuntu-latest'
         run: |
           set -e
           mkdir -p corpus/thermo corpus/waters corpus/bruker \
-            corpus/shimadzu/PXD034978 corpus/shimadzu/MTBLS432 corpus/shimadzu/MSV000084197
+            corpus/shimadzu/PXD034978 corpus/shimadzu/MTBLS432 corpus/shimadzu/MSV000084197 \
+            corpus/agilent corpus/sciex/PXD022088
 
           # Thermo (PXD068962, PRIDE, CC0)
           curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
@@ -116,6 +118,25 @@ jobs:
           curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
             -o corpus/shimadzu/MSV000084197/20190607_NM16.lcd \
             "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000084197%2Fraw%2F20190607_NM16.lcd"
+
+          # Agilent QTOF (PXD030293, PRIDE, CC0) - zipped bundle directory,
+          # ~960 KB zipped; same fixture wired into OpenARaw's own CI, see
+          # Sigilweaver/OpenARaw#28.
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" -o agilent.d.zip \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/07/PXD030293/180814-Sample19.d.zip"
+          unzip -q -d corpus/agilent agilent.d.zip
+          rm agilent.d.zip
+          test -d corpus/agilent/180814-Sample19.d
+
+          # SCIEX (PXD022088, PRIDE, CC0) - .wiff + .wiff.scan pair, ~2.5 MB
+          # total; same fixture wired into OpenSXRaw's own CI, see
+          # Sigilweaver/OpenSXRaw#33.
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
+            -o corpus/sciex/PXD022088/Rcor2KOESC1.wiff \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff"
+          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
+            -o corpus/sciex/PXD022088/Rcor2KOESC1.wiff.scan \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff.scan"
 
           du -sh corpus
 

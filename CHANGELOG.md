@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added Agilent (`.d`, MassHunter) and SCIEX (`.wiff`) smoke/centroid/
+  stream-vs-collect test coverage to
+  `crates/openmassspec-io/tests/vendor2mzml.rs`, which previously only
+  exercised Thermo, Waters, Bruker, and Shimadzu even though both vendors
+  are already wired into `openmassspec-io` behind the `agilent`/`sciex`
+  feature flags. `.github/workflows/ci.yml`'s corpus-download step now
+  also fetches the small Agilent QTOF (PXD030293, ~960 KB zipped) and
+  SCIEX (PXD022088, ~2.5 MB `.wiff`+`.wiff.scan` pair) fixtures already
+  validated by OpenARaw#28 and OpenSXRaw#33 respectively, so these six
+  new tests run for real in CI rather than skipping. (Sigilweaver/OpenMassSpec#25)
+
 ### Changed
 
 - Wired real corpus fixtures into CI for `crates/openmassspec-io/tests/vendor2mzml.rs`
