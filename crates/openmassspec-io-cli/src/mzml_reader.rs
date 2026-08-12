@@ -67,6 +67,8 @@ fn spectrum_to_record(stream_index: usize, s: RawSpectrum) -> SpectrumRecord {
     });
 
     SpectrumRecord {
+        extra: ::std::collections::BTreeMap::new(),
+        acquisition_event_id: None,
         index: s.index(),
         scan_number: stream_index as u32 + 1,
         native_id,

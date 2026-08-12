@@ -21,6 +21,7 @@ fn bin_path() -> PathBuf {
 
 fn make_metadata() -> RunMetadata {
     RunMetadata {
+        extra: ::std::collections::BTreeMap::new(),
         source_file_name: "synthetic.raw".into(),
         source_file_format: CvTerm::new("MS:1000563", "Thermo RAW format"),
         native_id_format: CvTerm::new("MS:1000768", "Thermo nativeID format"),
@@ -60,6 +61,8 @@ fn make_record(index: usize, scan: u32, ms_level: u32, rt_sec: f64) -> SpectrumR
         None
     };
     SpectrumRecord {
+        extra: ::std::collections::BTreeMap::new(),
+        acquisition_event_id: None,
         index,
         scan_number: scan,
         native_id: format!("controllerType=0 controllerNumber=1 scan={scan}"),

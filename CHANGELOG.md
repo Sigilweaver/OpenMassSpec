@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-08-12
+
 ### Added
 
 - Added Agilent (`.d`, MassHunter) and SCIEX (`.wiff`) smoke/centroid/
@@ -19,6 +21,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Re-pinned the vendor readers and `openmassspec-core` to their latest
+  releases: openmassspec-core 1.5.0, opentfraw 1.4.0, opentimstdf 1.3.3,
+  openwraw 1.2.9, openaraw 0.1.7, opensxraw 0.2.5, openszraw 0.1.4. The
+  core bump adds the defaulted `extra` / `acquisition_event_id` record
+  fields (projected as mzML `userParam`s); no reader populates them yet,
+  so output is unchanged.
 - Wired real corpus fixtures into CI for `crates/openmassspec-io/tests/vendor2mzml.rs`
   and `crates/openmassspec-io-cli/tests/cli_centroid.rs`, which previously
   always skipped in CI because they checked hardcoded sibling-checkout
