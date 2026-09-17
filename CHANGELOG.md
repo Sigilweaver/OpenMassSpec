@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.5] - 2026-09-17
+
+### Fixed
+
+- Re-pinned `opentfraw` to 1.4.1, which corrects Orbitrap profile m/z
+  positions by applying Thermo's per-chunk calibration correction in the m/z
+  domain rather than as a pre-conversion frequency offset.
+
 ## [1.5.4] - 2026-08-12
 
 ### Added
