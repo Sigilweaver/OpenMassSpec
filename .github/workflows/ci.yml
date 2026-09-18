@@ -114,10 +114,34 @@ jobs:
 
           # Shimadzu LCD, QTOF variant (MSV000084197, MassIVE, CC0) - via
           # the HTTPS download endpoint; the FTP endpoint requires FTPS
-          # and isn't reliably reachable with plain curl in CI.
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
-            -o corpus/shimadzu/MSV000084197/20190607_NM16.lcd \
-            "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000084197%2Fraw%2F20190607_NM16.lcd"
+          # and isn't reliably reachable with plain curl in CI. MassIVE can
+          # intermittently return an HTTP-success error document, so retry
+          # until the downloaded file has the Compound File Binary signature
+          # that every LCD file must begin with.
+          lcd_dest=corpus/shimadzu/MSV000084197/20190607_NM16.lcd
+          lcd_url="https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000084197%2Fraw%2F20190607_NM16.lcd"
+          for attempt in 1 2 3; do
+            rm -f "$lcd_dest.part"
+            curl --fail --retry 3 --retry-all-errors --retry-delay 2 -sSL \
+              --user-agent "OpenMassSpec-CI/1.0" -o "$lcd_dest.part" "$lcd_url"
+            if python3 - "$lcd_dest.part" <<'PY'
+          import pathlib
+          import sys
+
+          expected = bytes.fromhex("D0CF11E0A1B11AE1")
+          sys.exit(0 if pathlib.Path(sys.argv[1]).read_bytes().startswith(expected) else 1)
+          PY
+            then
+              mv "$lcd_dest.part" "$lcd_dest"
+              break
+            fi
+            rm -f "$lcd_dest.part"
+            if [ "$attempt" = 3 ]; then
+              echo "MassIVE did not return a valid Compound File Binary LCD" >&2
+              exit 1
+            fi
+            sleep "$attempt"
+          done
 
           # Agilent QTOF (PXD030293, PRIDE, CC0) - zipped bundle directory,
           # ~960 KB zipped; same fixture wired into OpenARaw's own CI, see
