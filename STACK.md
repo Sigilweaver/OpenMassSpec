@@ -7,11 +7,11 @@ Regenerate with `scripts/release-stack.sh --write-stack-md --apply`.
 
 | Component | Version | SHA |
 |-----------|---------|-----|
-| OpenMassSpec (umbrella) | 1.5.5 | `8249638` |
-| openmassspec-core | 1.5.0 | `0be789a` |
-| opentfraw | 1.4.1 | `63380df` |
-| opentimstdf | 1.3.3 | `bf70ce1` |
-| openwraw | 1.2.9 | `a5496b9` |
-| openaraw | 0.1.7 | `e980335` |
-| opensxraw | 0.2.5 | `2a11301` |
-| openszraw | 0.1.4 | `35e9a4b` |
+| OpenMassSpec (umbrella) | 2.0.0 | `c384709` |
+| openmassspec-core | 2.0.0 | `99075ea` |
+| opentfraw | 2.0.0 | `6504316` |
+| opentimstdf | 2.0.0 | `646d88e` |
+| openwraw | 3.0.0 | `ccd3107` |
+| openaraw | 0.2.0 | `186bd03` |
+| opensxraw | 0.3.0 | `a736db3` |
+| openszraw | 0.2.0 | `45a83e6` |
