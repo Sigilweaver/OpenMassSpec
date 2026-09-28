@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-28
+
 ### Added
 
 - Python now exposes the complete shared spectrum and precursor fields, full
@@ -12,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - Real-file Python parity tests compare the umbrella and native bindings.
 - Arrow batches now stream through a bounded buffer instead of materializing
   the complete run before returning a `RecordBatchReader`.
-
 - `acquisition_event_id` and `extra` columns in the Arrow schema.
 
 ### Changed
