@@ -25,7 +25,10 @@
 use std::path::{Path, PathBuf};
 
 use numpy::PyArray1;
-use openmassspec_core::{Activation, Polarity, PrecursorInfo, SpectrumRecord};
+use openmassspec_core::{
+    Activation, Analyzer, ChromatogramRecord, CvTerm, MobilityArrayKind, Polarity, PrecursorInfo,
+    SpectrumRecord,
+};
 use openmassspec_io::{detect_format, Detected};
 use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -77,6 +80,31 @@ fn activation_str(a: Activation) -> &'static str {
     }
 }
 
+fn analyzer_str(a: Analyzer) -> &'static str {
+    match a {
+        Analyzer::ITMS => "itms",
+        Analyzer::TQMS => "tqms",
+        Analyzer::SQMS => "sqms",
+        Analyzer::TOFMS => "tofms",
+        Analyzer::FTMS => "ftms",
+        Analyzer::Sector => "sector",
+    }
+}
+
+fn mobility_kind_str(k: MobilityArrayKind) -> &'static str {
+    match k {
+        MobilityArrayKind::InverseReducedVsPerCm2 => "inverse_reduced_k0",
+        MobilityArrayKind::DriftTimeMilliseconds => "drift_time_ms",
+    }
+}
+
+fn cv_term_to_dict<'py>(py: Python<'py>, term: &CvTerm) -> PyResult<Bound<'py, PyDict>> {
+    let d = PyDict::new(py);
+    d.set_item("accession", term.accession)?;
+    d.set_item("name", &term.name)?;
+    Ok(d)
+}
+
 // ---------------------------------------------------------------------
 // Spectrum (Python-facing record)
 // ---------------------------------------------------------------------
@@ -118,12 +146,24 @@ impl Spectrum {
         self.rec_ref().map(|r| r.effective_tic())
     }
     #[getter]
+    fn reported_total_ion_current(&self) -> PyResult<Option<f64>> {
+        self.rec_ref().map(|r| r.total_ion_current)
+    }
+    #[getter]
     fn base_peak_mz(&self) -> PyResult<Option<f64>> {
         self.rec_ref().map(|r| r.effective_base_peak().map(|t| t.0))
     }
     #[getter]
+    fn reported_base_peak_mz(&self) -> PyResult<Option<f64>> {
+        self.rec_ref().map(|r| r.base_peak_mz)
+    }
+    #[getter]
     fn base_peak_intensity(&self) -> PyResult<Option<f64>> {
         self.rec_ref().map(|r| r.effective_base_peak().map(|t| t.1))
+    }
+    #[getter]
+    fn reported_base_peak_intensity(&self) -> PyResult<Option<f64>> {
+        self.rec_ref().map(|r| r.base_peak_intensity)
     }
     #[getter]
     fn inv_mobility(&self) -> PyResult<Option<f64>> {
@@ -140,16 +180,11 @@ impl Spectrum {
     }
     #[getter]
     fn analyzer(&self) -> PyResult<Option<&'static str>> {
-        self.rec_ref().map(|r| {
-            r.analyzer.map(|a| match a {
-                openmassspec_core::Analyzer::ITMS => "itms",
-                openmassspec_core::Analyzer::TQMS => "tqms",
-                openmassspec_core::Analyzer::SQMS => "sqms",
-                openmassspec_core::Analyzer::TOFMS => "tofms",
-                openmassspec_core::Analyzer::FTMS => "ftms",
-                openmassspec_core::Analyzer::Sector => "sector",
-            })
-        })
+        self.rec_ref().map(|r| r.analyzer.map(analyzer_str))
+    }
+    #[getter]
+    fn acquisition_event_id(&self) -> PyResult<Option<u32>> {
+        self.rec_ref().map(|r| r.acquisition_event_id)
     }
     #[getter]
     fn filter(&self) -> PyResult<Option<String>> {
@@ -166,6 +201,14 @@ impl Spectrum {
     #[getter]
     fn high_mz(&self) -> PyResult<Option<f64>> {
         self.rec_ref().map(|r| r.high_mz)
+    }
+    #[getter]
+    fn faims_cv(&self) -> PyResult<Option<f64>> {
+        self.rec_ref().map(|r| r.faims_cv)
+    }
+    #[getter]
+    fn extra(&self) -> PyResult<std::collections::BTreeMap<String, String>> {
+        self.rec_ref().map(|r| r.extra.clone())
     }
 
     /// Zero-copy NumPy view over the m/z array (owned by NumPy after this
@@ -240,6 +283,8 @@ fn precursor_to_dict<'py>(py: Python<'py>, p: &PrecursorInfo) -> PyResult<Bound<
     d.set_item("ce_is_nce", p.ce_is_nce)?;
     d.set_item("precursor_native_id", p.precursor_native_id.clone())?;
     d.set_item("activation", p.activation.map(activation_str))?;
+    d.set_item("analyzer", p.analyzer.map(analyzer_str))?;
+    d.set_item("ccs", p.ccs)?;
     Ok(d)
 }
 
@@ -275,6 +320,22 @@ impl RunInfo {
     fn source_file_name(&self) -> &str {
         &self.meta.source_file_name
     }
+    #[getter]
+    fn source_file_format<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        cv_term_to_dict(py, &self.meta.source_file_format)
+    }
+    #[getter]
+    fn native_id_format<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        cv_term_to_dict(py, &self.meta.native_id_format)
+    }
+    #[getter]
+    fn instrument<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        cv_term_to_dict(py, &self.meta.instrument)
+    }
+    #[getter]
+    fn instrument_serial_number(&self) -> Option<&str> {
+        self.meta.instrument_serial_number.as_deref()
+    }
     /// Parser crate name (e.g. "opentfraw").
     #[getter]
     fn software_name(&self) -> &str {
@@ -285,6 +346,31 @@ impl RunInfo {
     fn software_version(&self) -> &str {
         &self.meta.software_version
     }
+    #[getter]
+    fn acquisition_software_name(&self) -> Option<&str> {
+        self.meta.acquisition_software_name.as_deref()
+    }
+    #[getter]
+    fn acquisition_software_version(&self) -> Option<&str> {
+        self.meta.acquisition_software_version.as_deref()
+    }
+    #[getter]
+    fn mobility_array_kind(&self) -> Option<&'static str> {
+        self.meta.mobility_array_kind.map(mobility_kind_str)
+    }
+    #[getter]
+    fn analyzers(&self) -> Vec<&'static str> {
+        self.meta
+            .analyzers
+            .iter()
+            .copied()
+            .map(analyzer_str)
+            .collect()
+    }
+    #[getter]
+    fn extra(&self) -> std::collections::BTreeMap<String, String> {
+        self.meta.extra.clone()
+    }
     fn __repr__(&self) -> String {
         format!(
             "<RunInfo instrument='{}' source='{}' software='{} {}'>",
@@ -293,6 +379,54 @@ impl RunInfo {
             self.meta.software_name,
             self.meta.software_version,
         )
+    }
+}
+
+/// One decoded chromatogram, with NumPy-backed time and intensity arrays.
+#[pyclass(module = "openmassspec_io._openmassspec_io")]
+struct Chromatogram {
+    rec: ChromatogramRecord,
+    n_points: usize,
+    time_sec: Py<PyArray1<f32>>,
+    intensity: Py<PyArray1<f32>>,
+}
+
+#[pymethods]
+impl Chromatogram {
+    #[getter]
+    fn index(&self) -> usize {
+        self.rec.index
+    }
+    #[getter]
+    fn id(&self) -> &str {
+        &self.rec.id
+    }
+    #[getter]
+    fn chromatogram_type<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
+        self.rec
+            .chromatogram_type
+            .as_ref()
+            .map(|term| cv_term_to_dict(py, term))
+            .transpose()
+    }
+    #[getter]
+    fn precursor_mz(&self) -> Option<f64> {
+        self.rec.precursor_mz
+    }
+    #[getter]
+    fn product_mz(&self) -> Option<f64> {
+        self.rec.product_mz
+    }
+    #[getter]
+    fn time_sec(&self, py: Python<'_>) -> Py<PyArray1<f32>> {
+        self.time_sec.clone_ref(py)
+    }
+    #[getter]
+    fn intensity(&self, py: Python<'_>) -> Py<PyArray1<f32>> {
+        self.intensity.clone_ref(py)
+    }
+    fn __len__(&self) -> usize {
+        self.n_points
     }
 }
 
@@ -447,6 +581,29 @@ fn run_info(
     Ok(RunInfo { meta })
 }
 
+/// Read the chromatogram traces available in a vendor acquisition.
+#[pyfunction]
+fn read_chromatograms(py: Python<'_>, path: PathBuf) -> PyResult<Vec<Chromatogram>> {
+    let detected = detected_or_err(&path)?;
+    let records = py
+        .detach(|| openmassspec_io::collect_chromatograms(detected))
+        .map_err(map_err)?;
+    Ok(records
+        .into_iter()
+        .map(|mut rec| {
+            let n_points = rec.time_sec.len();
+            let time_sec = PyArray1::from_vec(py, std::mem::take(&mut rec.time_sec)).unbind();
+            let intensity = PyArray1::from_vec(py, std::mem::take(&mut rec.intensity)).unbind();
+            Chromatogram {
+                rec,
+                n_points,
+                time_sec,
+                intensity,
+            }
+        })
+        .collect())
+}
+
 /// Iterate every spectrum in a vendor acquisition. Spectra are decoded on a
 /// background thread and handed across one at a time, so memory is bounded
 /// by a single in-flight spectrum rather than the whole run.
@@ -475,6 +632,55 @@ mod arrow_bridge {
     use arrow::pyarrow::ToPyArrow;
     use arrow::record_batch::RecordBatch;
     use openmassspec_core::arrow::SpectrumBatchBuilder;
+    use std::sync::{
+        mpsc::{sync_channel, Receiver, SyncSender},
+        Mutex,
+    };
+
+    /// Sent from the background decode thread. `Done` is always the last
+    /// message, so a closed channel without one means the thread died.
+    enum ArrowMsg {
+        Batch(RecordBatch),
+        Done(Result<(), String>),
+    }
+
+    #[pyclass(module = "openmassspec_io._openmassspec_io")]
+    pub(super) struct ArrowBatchIter {
+        receiver: Mutex<Receiver<ArrowMsg>>,
+        finished: bool,
+    }
+
+    #[pymethods]
+    impl ArrowBatchIter {
+        fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+            slf
+        }
+
+        fn __next__(mut slf: PyRefMut<'_, Self>, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+            if slf.finished {
+                return Ok(None);
+            }
+            let receiver = &slf.receiver;
+            let message = py.detach(|| {
+                receiver
+                    .lock()
+                    .map_err(|_| "Arrow stream lock poisoned".to_string())?
+                    .recv()
+                    .map_err(|_| "Arrow decode thread ended without a result".to_string())
+            });
+            match message {
+                Ok(ArrowMsg::Batch(batch)) => Ok(Some(batch.to_pyarrow(py)?.unbind())),
+                Ok(ArrowMsg::Done(Ok(()))) => {
+                    slf.finished = true;
+                    Ok(None)
+                }
+                Ok(ArrowMsg::Done(Err(error))) | Err(error) => {
+                    slf.finished = true;
+                    Err(PyRuntimeError::new_err(error))
+                }
+            }
+        }
+    }
 
     /// Build a `pyarrow.RecordBatchReader` over every spectrum in the
     /// acquisition, batched at `batch_size` rows (default 1024).
@@ -498,42 +704,43 @@ mod arrow_bridge {
             .detach(|| openmassspec_io::metadata_only(detected.clone()))
             .map_err(map_err)?;
         let mobility_kind = meta.mobility_array_kind;
-        let batches = py
-            .detach(|| {
-                stream_batches(
-                    detected,
-                    centroid,
-                    centroid_min_intensity,
-                    batch_size,
-                    mobility_kind,
-                )
-            })
-            .map_err(map_err)?;
-
-        // Hand the batches to pyarrow as a RecordBatchReader.
         let schema = openmassspec_core::arrow::spectrum_record_schema();
         let pa = py.import("pyarrow")?;
         let py_schema = schema.to_pyarrow(py)?;
-        let py_batches: Vec<Bound<'py, PyAny>> = batches
-            .into_iter()
-            .map(|b| b.to_pyarrow(py))
-            .collect::<PyResult<_>>()?;
+        let (sender, receiver) = sync_channel(2);
+        let batches = Py::new(
+            py,
+            ArrowBatchIter {
+                receiver: Mutex::new(receiver),
+                finished: false,
+            },
+        )?;
+        std::thread::spawn(move || {
+            let result = stream_batches(
+                detected,
+                centroid,
+                centroid_min_intensity,
+                batch_size,
+                mobility_kind,
+                &sender,
+            );
+            // Fails only when the reader was dropped early; nothing to report.
+            let _ = sender.send(ArrowMsg::Done(result));
+        });
         pa.getattr("RecordBatchReader")?
-            .call_method1("from_batches", (py_schema, py_batches))
+            .call_method1("from_batches", (py_schema, batches))
     }
 
     /// Push spectra into `batch_size`-row Arrow batches as they are
-    /// decoded, instead of collecting the whole run into a `Vec` first -
-    /// bounds memory to one in-progress batch rather than every spectrum
-    /// in the acquisition.
+    /// decoded. The bounded channel holds at most two finished batches.
     fn stream_batches(
         detected: Detected,
         centroid: bool,
         min_intensity: Option<f32>,
         batch_size: usize,
         mobility_kind: Option<openmassspec_core::MobilityArrayKind>,
-    ) -> Result<Vec<RecordBatch>, String> {
-        let mut out = Vec::new();
+        sender: &SyncSender<ArrowMsg>,
+    ) -> Result<(), String> {
         let mut builder = SpectrumBatchBuilder::new(mobility_kind);
         let mut n = 0usize;
         // `stream`'s callback must return `openmassspec_io::Result<()>`; an
@@ -553,7 +760,9 @@ mod arrow_bridge {
                     std::mem::replace(&mut builder, SpectrumBatchBuilder::new(mobility_kind));
                 match finished.finish() {
                     Ok(b) => {
-                        out.push(b);
+                        sender
+                            .send(ArrowMsg::Batch(b))
+                            .map_err(|_| openmassspec_io::Error::Cancelled)?;
                         n = 0;
                     }
                     Err(e) => {
@@ -577,9 +786,13 @@ mod arrow_bridge {
         stream_result.map_err(|e| e.to_string())?;
 
         if n > 0 {
-            out.push(builder.finish().map_err(|e| e.to_string())?);
+            sender
+                .send(ArrowMsg::Batch(
+                    builder.finish().map_err(|e| e.to_string())?,
+                ))
+                .map_err(|e| e.to_string())?;
         }
-        Ok(out)
+        Ok(())
     }
 }
 
@@ -593,10 +806,14 @@ fn _openmassspec_io(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Spectrum>()?;
     m.add_class::<SpectrumIter>()?;
     m.add_class::<RunInfo>()?;
+    m.add_class::<Chromatogram>()?;
     m.add_function(wrap_pyfunction!(detect, m)?)?;
     m.add_function(wrap_pyfunction!(to_mzml, m)?)?;
     m.add_function(wrap_pyfunction!(iter_spectra, m)?)?;
     m.add_function(wrap_pyfunction!(run_info, m)?)?;
+    m.add_function(wrap_pyfunction!(read_chromatograms, m)?)?;
+    #[cfg(feature = "arrow")]
+    m.add_class::<arrow_bridge::ArrowBatchIter>()?;
     #[cfg(feature = "arrow")]
     m.add_function(wrap_pyfunction!(arrow_bridge::read_arrow, m)?)?;
     Ok(())

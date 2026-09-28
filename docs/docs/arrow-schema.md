@@ -44,6 +44,8 @@ addition is a minor-version bump, any removal or rename is breaking.
 | `intensity`                   | `LargeList<Float32>`     | Same length as `mz`.                                                  |
 | `inv_mobility_per_peak`       | `LargeList<Float32>`, nullable | Present when the vendor carries a per-peak mobility array (e.g. Bruker TIMS).       |
 | `mobility_array_kind`         | `Utf8`, nullable         | `"inverse_reduced_k0"` / `"drift_time_ms"`; interpretation of `inv_mobility_per_peak` for every row in the batch. |
+| `acquisition_event_id`        | `UInt32`, nullable       | Native acquisition event or grouping number, when decoded.          |
+| `extra`                       | `Map<Utf8, Utf8>`        | Namespaced vendor values from `SpectrumRecord.extra`; empty when none are present. |
 
 `SpectrumBatchBuilder::new(Option<MobilityArrayKind>)` sets the
 `mobility_array_kind` value shared by every row in the batch. Pass
