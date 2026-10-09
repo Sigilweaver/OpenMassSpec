@@ -167,6 +167,7 @@ def test_openmassspec_io_reexports_present():
     assert callable(openmassspec.to_mzml)
     assert callable(openmassspec.iter_spectra)
     assert callable(openmassspec.detect_format)
+    assert openmassspec.RunInfo is not None
 
 
 def test_version_matches_installed_metadata():
@@ -268,6 +269,23 @@ def test_open_run_sciex_dispatch(monkeypatch, tmp_path: Path):
     assert calls == [("sciex", str(f))]
 
 
+def test_open_run_sciex_sample_dispatch(monkeypatch, tmp_path: Path):
+    import sys
+    import types
+
+    f = tmp_path / "sample.wiff"
+    f.write_bytes(b"")
+    (tmp_path / "sample.wiff.scan").write_bytes(b"")
+    calls = []
+
+    fake = types.ModuleType("opensxraw")
+    fake.open_sample = lambda p, sample: calls.append((p, sample)) or "sample-handle"
+    monkeypatch.setitem(sys.modules, "opensxraw", fake)
+
+    assert openmassspec.open_run(f, sample="sample-a") == "sample-handle"
+    assert calls == [(str(f), "sample-a")]
+
+
 def test_open_run_shimadzu_dispatch(monkeypatch, tmp_path: Path):
     """``open_run`` on a Shimadzu file imports openszraw and calls ``RawReader``."""
     import sys
@@ -296,10 +314,15 @@ def test_public_api_surface():
         "__version__",
         "VENDORS",
         "Spectrum",
+        "Chromatogram",
+        "RunInfo",
         "detect",
         "detect_format",
         "iter_spectra",
+        "read_chromatograms",
+        "read_arrow",
         "open_run",
+        "run_info",
         "to_mzml",
     }
     assert set(openmassspec.__all__) == expected

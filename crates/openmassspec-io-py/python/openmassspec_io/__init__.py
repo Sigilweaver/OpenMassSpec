@@ -1,14 +1,18 @@
 """Python bindings for openmassspec-io.
 
-Detect a vendor acquisition (Thermo / Bruker / Waters), convert it to mzML,
+Detect acquisitions from Thermo, Bruker, Waters, Agilent, SCIEX, and Shimadzu; convert them to mzML,
 or stream spectra as zero-copy NumPy arrays / pyarrow record batches.
 """
 
 from ._openmassspec_io import (
+    Chromatogram,
+    RunInfo,
     Spectrum,
     __version__,
     detect,
     iter_spectra,
+    read_chromatograms,
+    run_info,
     to_mzml,
 )
 
@@ -24,6 +28,10 @@ __all__ = [
     "detect",
     "to_mzml",
     "iter_spectra",
+    "run_info",
+    "RunInfo",
+    "Chromatogram",
+    "read_chromatograms",
     "Spectrum",
 ]
 

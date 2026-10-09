@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-28
+
+### Added
+
+- Python now exposes the complete shared spectrum and precursor fields, full
+  run metadata, chromatograms, and the new Arrow vendor metadata columns for
+  all six parsers. `open_run` accepts a SCIEX sample name.
+- Real-file Python parity tests compare the umbrella and native bindings.
+- Arrow batches now stream through a bounded buffer instead of materializing
+  the complete run before returning a `RecordBatchReader`.
+- `acquisition_event_id` and `extra` columns in the Arrow schema.
+
+### Changed
+
+- **Breaking (Rust):** adopts `openmassspec-core` 2.0.0 and arrow 60. Rust
+  code exchanging Arrow data with this crate must use arrow 60. The Python
+  API is unchanged apart from the additions above.
+- Requires the reader releases built on core 2.0.0: `opentfraw` 2.0.0,
+  `opentimstdf` 2.0.0, `openwraw` 3.0.0, `openaraw` 0.2.0, `opensxraw`
+  0.3.0, and `openszraw` 0.2.0. The metapackage extras pin the matching
+  major (or pre-1.0 minor) ranges.
+- `read_arrow` raises if decoding fails partway through, instead of ending
+  the stream early.
+- `mzdata` 0.65 -> 0.67 (CLI round-trip checks only).
+
 ## [1.5.5] - 2026-09-17
 
 ### Fixed

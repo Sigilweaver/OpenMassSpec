@@ -244,13 +244,34 @@ jobs:
         # handling); no bare `cargo build`/`cargo test` runs in this job.
         run: maturin develop --release --features pyo3/extension-module
       - name: Install openmassspec metapackage
-        run: pip install ./python
+        # openmassspec-io was built from this checkout in the prior step.
+        run: pip install ./python --no-deps
+      - name: Install standalone readers for parity
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        run: >-
+          pip install
+          'opentfraw>=2.0.0,<3' 'opentimstdf>=2.0.0,<3'
+          'openwraw>=3.0.0,<4' 'openaraw>=0.2.0,<1'
+          'opensxraw>=0.3.0,<1' 'openszraw>=0.2.0,<1'
+      - name: Download fixtures for Python parity
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        run: python scripts/fetch-python-parity-fixtures.py
       - name: Import smoke test
         run: python -c "import openmassspec_io; print(openmassspec_io.__version__ if hasattr(openmassspec_io, '__version__') else 'ok')"
       - name: Metapackage import smoke
         run: python -c "import openmassspec; print(openmassspec.__version__); assert callable(openmassspec.to_mzml)"
       - name: Metapackage tests
         run: pytest python/tests -v
+      - name: Python binding and parity tests
+        env:
+          OPENMASSSPEC_THERMO_RAW: corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw
+          OPENMASSSPEC_BRUKER_D: corpus/bruker/NQO1-F107C_coi-N2-P_200-0C_3996.d
+          OPENMASSSPEC_WATERS_RAW: corpus/waters/molecular_mass_P15_01.raw
+          OPENMASSSPEC_AGILENT_D: corpus/agilent/180814-Sample19.d
+          OPENMASSSPEC_SCIEX_WIFF: corpus/sciex/PXD022088/Rcor2KOESC1.wiff
+          OPENMASSSPEC_SHIMADZU_RAW: corpus/shimadzu/PXD034978/49_27a__8122021_11.qgd
+          OPENMASSSPEC_REQUIRE_PARITY: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' && '1' || '0' }}
+        run: pytest crates/openmassspec-io-py/tests -v
 
   docs:
     name: Docs (Docusaurus)

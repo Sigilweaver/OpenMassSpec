@@ -1054,6 +1054,83 @@ pub fn metadata_only(detected: Detected) -> Result<openmassspec_core::RunMetadat
     }
 }
 
+/// Decode chromatogram traces from a vendor acquisition without decoding
+/// its spectra. The returned records retain their native channel IDs and
+/// time/intensity arrays; vendors without decoded traces return an empty vec.
+#[allow(clippy::needless_pass_by_value)]
+pub fn collect_chromatograms(
+    detected: Detected,
+) -> Result<Vec<openmassspec_core::ChromatogramRecord>> {
+    #[allow(unused_imports)]
+    use openmassspec_core::SpectrumSource;
+    match detected.format {
+        VendorFormat::ThermoRaw => {
+            #[cfg(feature = "thermo")]
+            {
+                use std::fs::File;
+                use std::io::BufReader;
+                let raw = opentfraw::RawFileReader::open_path(&detected.path)?;
+                let mut source = BufReader::with_capacity(2 << 20, File::open(&detected.path)?);
+                let filename = detected
+                    .path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown.raw");
+                let mut src =
+                    opentfraw::mzml::OpenTfRawSource::new(&raw, &mut source, filename, false);
+                Ok(src.iter_chromatograms().collect())
+            }
+            #[cfg(not(feature = "thermo"))]
+            Err(Error::FeatureDisabled { vendor: "thermo" })
+        }
+        VendorFormat::BrukerTdf => {
+            #[cfg(feature = "bruker")]
+            {
+                let mut src = opentimstdf::mzml::TdfSource::open(&detected.path)?;
+                Ok(src.iter_chromatograms().collect())
+            }
+            #[cfg(not(feature = "bruker"))]
+            Err(Error::FeatureDisabled { vendor: "bruker" })
+        }
+        VendorFormat::WatersRaw => {
+            #[cfg(feature = "waters")]
+            {
+                let mut src = openwraw::mzml::WatersSource::open(&detected.path)?;
+                Ok(src.iter_chromatograms().collect())
+            }
+            #[cfg(not(feature = "waters"))]
+            Err(Error::FeatureDisabled { vendor: "waters" })
+        }
+        VendorFormat::AgilentMassHunter => {
+            #[cfg(feature = "agilent")]
+            {
+                let mut src = openaraw::reader::Reader::open(&detected.path)?;
+                Ok(src.iter_chromatograms().collect())
+            }
+            #[cfg(not(feature = "agilent"))]
+            Err(Error::FeatureDisabled { vendor: "agilent" })
+        }
+        VendorFormat::SciexWiff => {
+            #[cfg(feature = "sciex")]
+            {
+                let mut src = opensxraw::reader::Reader::open(&detected.path)?;
+                Ok(src.iter_chromatograms().collect())
+            }
+            #[cfg(not(feature = "sciex"))]
+            Err(Error::FeatureDisabled { vendor: "sciex" })
+        }
+        VendorFormat::ShimadzuLabSolutions => {
+            #[cfg(feature = "shimadzu")]
+            {
+                let mut src = openszraw::reader::Reader::open(&detected.path)?;
+                Ok(src.iter_chromatograms().collect())
+            }
+            #[cfg(not(feature = "shimadzu"))]
+            Err(Error::FeatureDisabled { vendor: "shimadzu" })
+        }
+    }
+}
+
 /// A trivial in-memory [`openmassspec_core::SpectrumSource`] backed by a
 /// `Vec<SpectrumRecord>` + a [`openmassspec_core::RunMetadata`]. Hand it
 /// to `openmassspec_core::write_mzml` when you already have the records

@@ -54,25 +54,43 @@ except PackageNotFoundError:  # pragma: no cover - source checkout fallback
 # ``from openmassspec import to_mzml, iter_spectra, detect_format``.
 try:
     from openmassspec_io import (  # type: ignore[import-not-found]
+        Chromatogram,
+        RunInfo,
         Spectrum,
         iter_spectra,
+        read_chromatograms,
+        run_info,
         to_mzml,
     )
     from openmassspec_io import detect as detect_format  # type: ignore[import-not-found]
+    try:
+        from openmassspec_io import read_arrow  # type: ignore[import-not-found]
+    except ImportError:  # pragma: no cover - wheel built without Arrow
+        read_arrow = None  # type: ignore[assignment]
 except ImportError:  # pragma: no cover - openmassspec_io is a hard dep
     Spectrum = None  # type: ignore[assignment]
+    Chromatogram = None  # type: ignore[assignment]
+    RunInfo = None  # type: ignore[assignment]
     detect_format = None  # type: ignore[assignment]
     iter_spectra = None  # type: ignore[assignment]
+    read_chromatograms = None  # type: ignore[assignment]
+    read_arrow = None  # type: ignore[assignment]
+    run_info = None  # type: ignore[assignment]
     to_mzml = None  # type: ignore[assignment]
 
 __all__ = [
     "__version__",
     "VENDORS",
     "Spectrum",
+    "Chromatogram",
+    "RunInfo",
     "detect",
     "detect_format",
     "iter_spectra",
+    "read_chromatograms",
+    "read_arrow",
     "open_run",
+    "run_info",
     "to_mzml",
 ]
 
@@ -107,15 +125,19 @@ def detect(path: str | os.PathLike[str]) -> Optional[str]:
     return detect_format(Path(path))
 
 
-def open_run(path: str | os.PathLike[str]):
+def open_run(path: str | os.PathLike[str], *, sample: str | None = None):
     """Detect *path*, import the matching vendor package, and open the run.
 
-    Raises ``ImportError`` if the matching vendor extra is not installed and
-    ``ValueError`` if the format cannot be detected.
+    For a multi-sample SCIEX WIFF file, pass a sample name from
+    ``opensxraw.list_samples(path)``. Raises ``ImportError`` if the matching
+    vendor extra is not installed and ``ValueError`` if the format cannot be
+    detected.
     """
     kind = detect(path)
     if kind is None:
         raise ValueError(f"no supported vendor format detected at {path}")
+    if sample is not None and kind != "sciex":
+        raise ValueError("sample selection is only available for SCIEX WIFF files")
     if kind == "thermo":
         import opentfraw  # type: ignore[import-not-found]
 
@@ -135,6 +157,8 @@ def open_run(path: str | os.PathLike[str]):
     if kind == "sciex":
         import opensxraw  # type: ignore[import-not-found]
 
+        if sample is not None:
+            return opensxraw.open_sample(str(path), sample)
         return opensxraw.RawReader(str(path))
     if kind == "shimadzu":
         import openszraw  # type: ignore[import-not-found]
