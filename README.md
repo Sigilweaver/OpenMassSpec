@@ -5,7 +5,7 @@
 [![crates.io](https://img.shields.io/crates/v/openmassspec-io.svg)](https://crates.io/crates/openmassspec-io)
 [![PyPI](https://img.shields.io/pypi/v/openmassspec.svg)](https://pypi.org/project/openmassspec/)
 [![docs.rs](https://img.shields.io/docsrs/openmassspec-io)](https://docs.rs/openmassspec-io)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/Sigilweaver/OpenMassSpec/blob/main/LICENSE)
 [![Rust MSRV](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![Docs](https://img.shields.io/badge/docs-sigilweaver.app-blue.svg)](https://sigilweaver.app/openmassspec/docs/)
 
@@ -23,9 +23,9 @@
 
 | Layer | Crate | What it does |
 | --- | --- | --- |
-| Umbrella | [`openmassspec-io`](crates/openmassspec-io) | Feature-gated re-exports + `detect_format` + `convert_to_mzml` |
-| CLI | [`openmassspec-io-cli`](crates/openmassspec-io-cli) | `vendor2mzml` one-shot binary |
-| Python | [`openmassspec`](python) | Metapackage exposing the converter from Python |
+| Umbrella | [`openmassspec-io`](https://github.com/Sigilweaver/OpenMassSpec/tree/main/crates/openmassspec-io) | Feature-gated re-exports + `detect_format` + `convert_to_mzml` |
+| CLI | [`openmassspec-io-cli`](https://github.com/Sigilweaver/OpenMassSpec/tree/main/crates/openmassspec-io-cli) | `vendor2mzml` one-shot binary |
+| Python | [`openmassspec`](https://github.com/Sigilweaver/OpenMassSpec/tree/main/python) | Metapackage exposing the converter from Python |
 | Shared core | [openmassspec-core](https://github.com/Sigilweaver/OpenMassSpecCore) | `SpectrumRecord`, Arrow batch, mzML writer |
 | Thermo `.raw` | [opentfraw](https://github.com/Sigilweaver/OpenTFRaw) | Finnigan reader |
 | Bruker `.d/` | [opentimstdf](https://github.com/Sigilweaver/OpenTimsTDF) | timsTOF TDF reader |
@@ -34,7 +34,7 @@
 | SCIEX `.wiff` | [opensxraw](https://github.com/Sigilweaver/OpenSXRaw) | legacy `.wiff`/`.wiff.scan` reader |
 | Shimadzu `.qgd`/`.lcd` | [openszraw](https://github.com/Sigilweaver/OpenSZRaw) | LabSolutions GC-MS/LC-MS reader |
 
-Current pinned stack lives in [STACK.md](STACK.md).
+Current pinned stack lives in [STACK.md](https://github.com/Sigilweaver/OpenMassSpec/blob/main/STACK.md).
 
 ## Install
 
@@ -100,19 +100,19 @@ openmassspec.to_mzml("sample.raw", "sample.mzML", indexed=True)
 Full reference, conversion semantics, and the per-vendor parser notes
 live at [**sigilweaver.app/openmassspec/docs**](https://sigilweaver.app/openmassspec/docs/).
 
-The source for that site is in [`docs/`](docs/) (Docusaurus). See
-[docs/README.md](docs/README.md) for the build commands.
+The source for that site is in [`docs/`](https://github.com/Sigilweaver/OpenMassSpec/tree/main/docs) (Docusaurus). See
+[docs/README.md](https://github.com/Sigilweaver/OpenMassSpec/blob/main/docs/README.md) for the build commands.
 
 ## Contributing
 
 Bug reports and PRs are welcome on any of the five repos. See
-[SECURITY.md](SECURITY.md) for the security policy.
+[SECURITY.md](https://github.com/Sigilweaver/OpenMassSpec/blob/main/SECURITY.md) for the security policy.
 
-This umbrella ships releases via [`scripts/release-stack.sh`](scripts/release-stack.sh)
+This umbrella ships releases via [`scripts/release-stack.sh`](https://github.com/Sigilweaver/OpenMassSpec/blob/main/scripts/release-stack.sh)
 which gates on the downstream [SpecLance](https://github.com/Sigilweaver/SpecLance)
 truth-test before tagging.
 
 ## License
 
-[Apache-2.0](LICENSE). Each vendor crate carries its own header and
+[Apache-2.0](https://github.com/Sigilweaver/OpenMassSpec/blob/main/LICENSE). Each vendor crate carries its own header and
 upstream attribution; this repo only orchestrates them.
