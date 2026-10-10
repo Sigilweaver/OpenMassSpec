@@ -179,6 +179,114 @@ fn validate_bad_mzml_reports_conformance_failure() {
 }
 
 #[test]
+fn validate_accepts_empty_spectra_and_target_only_precursors() {
+    // The core writer omits binaryDataArrayList for spectra with no peaks
+    // (allowed by the mzML schema) and writes only the isolation target
+    // when a precursor has no selected-ion m/z (Agilent Q-TOF MS2). Both
+    // must read back as valid spectra.
+    let mut empty = make_record(0, 1, 1, 0.5);
+    empty.mz.clear();
+    empty.intensity.clear();
+    empty.total_ion_current = None;
+    empty.base_peak_mz = None;
+    empty.base_peak_intensity = None;
+    empty.low_mz = None;
+    empty.high_mz = None;
+    let mut ms2 = make_record(1, 2, 2, 0.8);
+    let pre = ms2.precursor.as_mut().expect("ms2 precursor");
+    pre.selected_mz = None;
+    pre.charge = None;
+    pre.intensity = None;
+    pre.precursor_native_id = None;
+    let records = vec![empty, ms2, make_record(2, 3, 1, 1.2)];
+
+    let path = tmp_path("empty-and-target-only.mzML");
+    let mut src = VecSource::new(make_metadata(), records);
+    let mut w = BufWriter::new(File::create(&path).expect("create mzml"));
+    write_mzml(&mut src, &mut w).expect("write mzml");
+    w.flush().expect("flush");
+    drop(w);
+    let written = std::fs::read_to_string(&path).expect("read back");
+    assert_eq!(
+        written.matches("<binaryDataArrayList").count(),
+        2,
+        "empty spectrum should carry no binaryDataArrayList"
+    );
+
+    let out = Command::new(bin_path())
+        .arg("validate")
+        .arg("--json")
+        .arg(&path)
+        .output()
+        .expect("run vendor2mzml");
+    let _ = std::fs::remove_file(&path);
+
+    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+    assert!(
+        out.status.success(),
+        "expected success, got status={:?}, stdout={}, stderr={}",
+        out.status.code(),
+        stdout,
+        stderr
+    );
+    assert!(
+        stdout.contains("\"spectrum_count\":3"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_rejects_spectrum_with_only_one_array() {
+    // A spectrum carrying an m/z array but no intensity array is not an
+    // empty spectrum; it must be reported, not read as zero peaks.
+    let path = tmp_path("mz-only.mzML");
+    let mzml = bad_mzml_with_array_length_mismatch();
+    let start = mzml
+        .find("          <binaryDataArray encodedLength")
+        .and_then(|first| {
+            mzml[first + 1..]
+                .find("          <binaryDataArray encodedLength")
+                .map(|second| first + 1 + second)
+        })
+        .expect("second binaryDataArray");
+    let end = start
+        + mzml[start..]
+            .find("</binaryDataArray>\n")
+            .expect("end of second array")
+        + "</binaryDataArray>\n".len();
+    let mzml = format!("{}{}", &mzml[..start], &mzml[end..]).replace(
+        r#"<binaryDataArrayList count="2">"#,
+        r#"<binaryDataArrayList count="1">"#,
+    );
+    assert!(!mzml.contains("MS:1000515"), "intensity array not removed");
+    std::fs::write(&path, mzml).expect("write mz-only mzML");
+
+    let out = Command::new(bin_path())
+        .arg("validate")
+        .arg("--json")
+        .arg(&path)
+        .output()
+        .expect("run vendor2mzml");
+    let _ = std::fs::remove_file(&path);
+
+    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "expected exit code 1, got {:?}, stdout={}, stderr={}",
+        out.status.code(),
+        stdout,
+        stderr
+    );
+    assert!(
+        stdout.contains("no intensity array") || stderr.contains("no intensity array"),
+        "stdout={stdout}, stderr={stderr}"
+    );
+}
+
+#[test]
 fn validate_unknown_input_returns_two() {
     let path = tmp_path("garbage.bin");
     std::fs::write(&path, b"not an mzml and not a vendor file").expect("write");
