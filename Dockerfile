@@ -19,7 +19,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/src/target \
-    cargo build --release -p openmassspec-io-cli \
+    cargo build --locked --release -p openmassspec-io-cli \
     && install -D -m 0755 target/release/vendor2mzml /out/vendor2mzml
 
 FROM ${RUNTIME_IMAGE}
