@@ -1,0 +1,119 @@
+# Container image for vendor2mzml.
+#
+# - pull_request: build the image from ./Dockerfile and smoke-test it
+#   (convert a small public fixture, check the mzML with xmllint and
+#   `vendor2mzml validate`). Nothing is pushed.
+# - push of a v* tag: same build and smoke test, then push to
+#   ghcr.io/sigilweaver/vendor2mzml as <version> (tag without the
+#   leading v) and latest.
+#
+# Authenticates to ghcr.io with the workflow's GITHUB_TOKEN; no other
+# secrets are used. The image is linux/amd64 only.
+
+name: Docker
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/sigilweaver/vendor2mzml
+
+jobs:
+  image:
+    name: Build, smoke test, publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build image (load locally for the smoke test)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: vendor2mzml:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Agilent QTOF (PXD030293, PRIDE, CC0), ~960 KB zipped - the same
+      # fixture ci.yml downloads for the Rust and Python smoke tests.
+      - name: Download smoke-test fixture
+        run: |
+          set -e
+          mkdir -p smoke
+          curl --fail --retry 3 --retry-all-errors --retry-delay 2 -sSL \
+            --user-agent "OpenMassSpec-CI/1.0" -o agilent.d.zip \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/07/PXD030293/180814-Sample19.d.zip"
+          unzip -q -d smoke agilent.d.zip
+          rm agilent.d.zip
+          test -d smoke/180814-Sample19.d
+
+      - name: Install xmllint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxml2-utils
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          run() {
+            docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/smoke:/data" vendor2mzml:ci "$@"
+          }
+          run --version
+          run --help
+          run convert /data/180814-Sample19.d /data/out.mzML --indexed
+          test -s smoke/out.mzML
+
+          # Well-formed XML, indexedmzML root, at least one spectrum.
+          xmllint --noout smoke/out.mzML
+          root=$(xmllint --xpath 'local-name(/*)' smoke/out.mzML)
+          spectra=$(xmllint --xpath "count(//*[local-name()='spectrum'])" smoke/out.mzML)
+          echo "root=$root spectra=$spectra"
+          test "$root" = "indexedmzML"
+          test "$spectra" -gt 0
+
+          # Re-read the written mzML through the conformance harness.
+          run validate /data/out.mzML
+
+      - name: Log in to ghcr.io
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

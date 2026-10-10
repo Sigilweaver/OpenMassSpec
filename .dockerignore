@@ -1,0 +1,7 @@
+# Allowlist: the image build only needs the cargo workspace and LICENSE.
+*
+!Cargo.toml
+!Cargo.lock
+!crates/
+!LICENSE
+crates/**/target/
