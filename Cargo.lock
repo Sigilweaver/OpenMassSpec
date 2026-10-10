@@ -1152,9 +1152,9 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-core"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d35a0865b854555b9794b5cb89ad93cceeb93ed070a0e16875e3cfa05c7ac36"
+checksum = "2550f4ce87abc38b388fe8123a4824b4cc21e63d8d9c272e4843269ed75d3b1a"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
