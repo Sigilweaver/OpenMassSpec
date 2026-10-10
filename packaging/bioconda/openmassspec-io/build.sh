@@ -7,7 +7,6 @@ export RUST_BACKTRACE=1
 # shipped via about/license_file in meta.yaml.
 cargo-bundle-licenses --format yaml --output THIRDPARTY.yml
 
-# The source tarball carries no Cargo.lock, so --locked is not passed.
 cargo install -v --locked --no-track \
     --root "${PREFIX}" \
     --path crates/openmassspec-io-cli

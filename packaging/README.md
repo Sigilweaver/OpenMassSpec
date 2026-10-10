@@ -8,19 +8,6 @@ beyond the GitHub release binaries and PyPI.
 | Docker (ghcr.io) | [`../Dockerfile`](../Dockerfile), [`../.github/workflows/docker.yml`](../.github/workflows/docker.yml) | Built and smoke-tested on PRs; pushed on `v*` tags |
 | bioconda | [`bioconda/openmassspec-io/`](bioconda/openmassspec-io/) | Draft only, not submitted |
 
-## Current blocker: openaraw 0.2.0 is yanked
-
-The workspace depends on `openaraw = "0.2.0"`, and that version is
-yanked on crates.io with no other 0.2.x release. The repository does not
-commit a `Cargo.lock`, so every from-source build resolves dependencies
-fresh and fails with `version 0.2.0 is yanked`. This applies to the
-Docker image build, the bioconda recipe, and `cargo install` from
-`main`. Turning off the `agilent` feature does not help: cargo resolves
-optional dependencies whether or not their feature is enabled.
-
-The umbrella 2.0 release is on hold until openaraw 0.3.0 is published.
-Until then the `Docker` workflow fails at the image build step.
-
 ## Docker
 
 The `Dockerfile` is a two-stage build:
