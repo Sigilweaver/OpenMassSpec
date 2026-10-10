@@ -38,18 +38,25 @@ Current pinned stack lives in [STACK.md](STACK.md).
 
 ## Install
 
-### CLI
-
-Pre-built `vendor2mzml` binaries land on the GitHub
-[Releases](https://github.com/Sigilweaver/OpenMassSpec/releases) page.
-
-Or build from source:
+### pip
 
 ```sh
-cargo install openmassspec-io-cli --features all
+pip install openmassspec
 ```
 
-### Rust library
+Installs the Python API (`openmassspec.to_mzml`). The `vendor2mzml`
+command-line tool is not part of the Python package.
+
+### cargo
+
+The `vendor2mzml` CLI (crate `openmassspec-io-cli`) is not published to
+crates.io; install it from a release tag of this repository:
+
+```sh
+cargo install --git https://github.com/Sigilweaver/OpenMassSpec --tag v1.5.5 openmassspec-io-cli
+```
+
+The Rust library is on crates.io:
 
 ```toml
 [dependencies]
@@ -59,18 +66,38 @@ openmassspec-io = { version = "1.0", features = ["all"] }
 Vendor features are independent (`thermo`, `bruker`, `waters`,
 `agilent`, `sciex`, `shimadzu`) so you only compile what you ship.
 
-### Python
+Pre-built `vendor2mzml` binaries for Linux, macOS, and Windows are
+attached to each GitHub
+[release](https://github.com/Sigilweaver/OpenMassSpec/releases).
+
+### Docker
+
+The [`Dockerfile`](Dockerfile) builds an image whose entrypoint is
+`vendor2mzml`:
 
 ```sh
-pip install openmassspec
+docker build -t vendor2mzml .
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/data" \
+  vendor2mzml convert /data/sample.raw /data/sample.mzML --indexed
 ```
+
+The image runs as a non-root user; `--user` makes the output file owned
+by you. Release tags (`v*`) publish the image to
+`ghcr.io/sigilweaver/vendor2mzml` as `<version>` and `latest` (see
+[`.github/workflows/docker.yml`](.github/workflows/docker.yml)).
+
+### bioconda (pending)
+
+Not yet available. A recipe draft lives in
+[`packaging/bioconda/`](packaging/bioconda/); see
+[`packaging/README.md`](packaging/README.md) for its status.
 
 ## Use it
 
 ### Convert a file
 
 ```sh
-vendor2mzml /data/sample.raw /tmp/sample.mzML --indexed
+vendor2mzml convert /data/sample.raw /tmp/sample.mzML --indexed
 ```
 
 `vendor2mzml` sniffs the format from the path (or directory layout for

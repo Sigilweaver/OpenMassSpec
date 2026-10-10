@@ -248,10 +248,16 @@ jobs:
         run: pip install ./python --no-deps
       - name: Install standalone readers for parity
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        # openaraw is pinned with == to the version Cargo.lock links into
+        # openmassspec-io, so the parity test compares like with like.
+        # openaraw 0.2.0 is yanked on PyPI and crates.io; pip ignores a
+        # yanked release for range specifiers but installs it for an exact
+        # == pin (PEP 592), as cargo does for a locked version. Move this
+        # pin together with Cargo.lock when openaraw is upgraded.
         run: >-
           pip install
           'opentfraw>=2.0.0,<3' 'opentimstdf>=2.0.0,<3'
-          'openwraw>=3.0.0,<4' 'openaraw>=0.2.0,<1'
+          'openwraw>=3.0.0,<4' 'openaraw==0.2.0'
           'opensxraw>=0.3.0,<1' 'openszraw>=0.2.0,<1'
       - name: Download fixtures for Python parity
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
