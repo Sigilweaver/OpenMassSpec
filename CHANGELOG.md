@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-10-11
 
 ### Breaking (Rust)
 
@@ -87,7 +87,12 @@ All notable changes to this project will be documented in this file.
 - `Detected::new` to pair a path with a format without probing.
 - `convert_to_mzml` flushes its output file and reports a flush failure
   instead of losing it on drop.
-
+- Container image for `vendor2mzml`: release tags publish
+  `ghcr.io/sigilweaver/vendor2mzml:<version>` and `:latest`, built from
+  the `Dockerfile` with `--locked` and smoke-tested on every pull request.
+- `Cargo.lock` is committed, so the CLI, wheels and image build against
+  the same dependency versions.
+- A bioconda recipe draft under `packaging/bioconda` (not yet submitted).
 - Python now exposes the complete shared spectrum and precursor fields, full
   run metadata, chromatograms, and the new Arrow vendor metadata columns for
   all six parsers. `open_run` accepts a SCIEX sample name.
@@ -103,12 +108,25 @@ All notable changes to this project will be documented in this file.
 - `read_arrow` raises if decoding fails partway through, instead of ending
   the stream early.
 - `mzdata` 0.65 -> 0.67 (CLI round-trip checks only).
+- The `openmassspec-io` crate ships its own `LICENSE` copy, and the
+  `openmassspec` metapackage uses PEP 639 license metadata. README links
+  are absolute so they resolve on crates.io and PyPI.
+- `openmassspec-io-cli` is marked `publish = false`; install `vendor2mzml`
+  from a release tag, the release binaries, or the container image.
 - `vendor2mzml convert` writes exact `<spectrumList count>` values and
   consecutive `index` attributes (from `openmassspec-core` 3.0). The
   writer holds encoded spectra until the run is read to the end, spilling
   past 64 MiB to a temporary file; `convert` puts that file in the output
   file's directory instead of the system temp dir, and removes it when
   the conversion ends.
+
+### Fixed
+
+- `vendor2mzml validate` no longer panics on mzML spectra without binary
+  arrays (the writer omits them for empty spectra), and reports a
+  spectrum with only one of the two arrays as an error. It now reads the
+  isolation window target m/z and the precursor `spectrumRef`, so Agilent
+  Q-TOF MS2 spectra are no longer flagged as missing a precursor.
 
 ## [1.5.5] - 2026-09-17
 
