@@ -72,7 +72,7 @@ attached to each GitHub
 
 ### Docker
 
-The [`Dockerfile`](Dockerfile) builds an image whose entrypoint is
+The [`Dockerfile`](https://github.com/Sigilweaver/OpenMassSpec/blob/main/Dockerfile) builds an image whose entrypoint is
 `vendor2mzml`:
 
 ```sh
@@ -84,13 +84,13 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/data" \
 The image runs as a non-root user; `--user` makes the output file owned
 by you. Release tags (`v*`) publish the image to
 `ghcr.io/sigilweaver/vendor2mzml` as `<version>` and `latest` (see
-[`.github/workflows/docker.yml`](.github/workflows/docker.yml)).
+[`.github/workflows/docker.yml`](https://github.com/Sigilweaver/OpenMassSpec/blob/main/.github/workflows/docker.yml)).
 
 ### bioconda (pending)
 
 Not yet available. A recipe draft lives in
-[`packaging/bioconda/`](packaging/bioconda/); see
-[`packaging/README.md`](packaging/README.md) for its status.
+[`packaging/bioconda/`](https://github.com/Sigilweaver/OpenMassSpec/tree/main/packaging/bioconda); see
+[`packaging/README.md`](https://github.com/Sigilweaver/OpenMassSpec/blob/main/packaging/README.md) for its status.
 
 ## Use it
 
