@@ -248,11 +248,16 @@ jobs:
         run: pip install ./python --no-deps
       - name: Install standalone readers for parity
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        # Installed from PyPI at the majors the Rust workspace requires
+        # (Cargo.toml [workspace.dependencies]); move both together. This
+        # step needs those releases on PyPI: opentfraw 3.0.0, opentimstdf
+        # 3.0.0, openwraw 4.0.0, openaraw 1.0.0, opensxraw 0.4.0,
+        # openszraw 0.3.0. openaraw 0.2.0 is yanked.
         run: >-
           pip install
-          'opentfraw>=2.0.0,<3' 'opentimstdf>=2.0.0,<3'
-          'openwraw>=3.0.0,<4' 'openaraw>=0.2.0,<1'
-          'opensxraw>=0.3.0,<1' 'openszraw>=0.2.0,<1'
+          'opentfraw>=3.0.0,<4' 'opentimstdf>=3.0.0,<4'
+          'openwraw>=4.0.0,<5' 'openaraw>=1.0.0,<2'
+          'opensxraw>=0.4.0,<0.5' 'openszraw>=0.3.0,<0.4'
       - name: Download fixtures for Python parity
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: python scripts/fetch-python-parity-fixtures.py
