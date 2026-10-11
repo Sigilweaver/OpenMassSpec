@@ -294,3 +294,17 @@ jobs:
         run: bun run build:cloudflare
       # Cloudflare deployment is handled by the Cloudflare GitHub App
       # via push events. No wrangler deploy step is needed here.
+
+  # Public API compatibility of the crates.io-published crate against its
+  # latest published version. A breaking change without a matching version
+  # bump fails; a deliberate major bump passes. OS-independent, so Linux only.
+  semver-checks:
+    name: Semver checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: cargo semver-checks
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: openmassspec-io
