@@ -57,9 +57,9 @@ settings if it should be pullable without authentication.
 Rust conventions:
 
 - `build.sh` runs `cargo-bundle-licenses` to write `THIRDPARTY.yml`, then
-  `cargo install --no-track --root "$PREFIX" --path crates/openmassspec-io-cli`.
-  `--locked` is not passed because the source tarball has no
-  `Cargo.lock`. Add it if a lockfile is committed later.
+  `cargo install --locked --no-track --root "$PREFIX" --path crates/openmassspec-io-cli`.
+  `--locked` builds against the committed `Cargo.lock`, which the source
+  tarball includes.
 - Build requirements are `compiler('rust')`, plus `compiler('c')` and
   `stdlib('c')`, because `zstd-sys` (through opentimstdf) compiles
   bundled C.
@@ -76,8 +76,7 @@ been submitted to bioconda or conda-forge.
 
 ### Submission steps
 
-1. Wait until openaraw 0.3.0 is published, the workspace dependency is
-   updated, and the release tag (for example `v2.0.0`) is pushed.
+1. Wait until the release tag (for example `v2.0.0`) is pushed.
    Confirm that `cargo install --git https://github.com/Sigilweaver/OpenMassSpec --tag v2.0.0 openmassspec-io-cli`
    builds.
 2. Set `version` in `meta.yaml` to the tag without the leading `v`.
