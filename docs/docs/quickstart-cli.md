@@ -20,6 +20,16 @@ vendor2mzml convert sample.raw sample.mzML.gz
 hash, so downstream tools (mzML2HDF, ProteoWizard's `msconvert`,
 `MzIdentML` builders) can index-jump into the file.
 
+## Disk space
+
+`<spectrumList count>` must hold the number of spectra actually written,
+which is known only after the last one. The writer therefore holds the
+encoded spectra until the run is read to the end: in memory up to 64 MiB,
+then in a temporary file in the output file's directory. The file is
+removed when the conversion ends, successful or not. While a large
+conversion runs, that directory needs room for the output plus the
+uncompressed spectra (for `.mzML.gz` output the spool is not gzipped).
+
 ## Unreadable spectra
 
 A spectrum or chromatogram the vendor reader cannot decode is left out

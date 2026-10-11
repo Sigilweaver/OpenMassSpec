@@ -163,6 +163,15 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
         .with_centroid(args.centroid)
         .with_centroid_min_intensity(args.centroid_min_intensity)
         .with_record_error_policy(policy);
+    // The writer holds encoded spectra until the run is read to the end
+    // (so <spectrumList count> is exact), spilling past 64 MiB to a
+    // temporary file. Put that file next to the output, where the space
+    // for the result has to exist anyway, not in the system temp dir.
+    let write = opts
+        .write
+        .clone()
+        .with_spool_dir(spool_dir_for(&args.output));
+    let opts = opts.with_write_options(write);
     let summary = match convert_to_mzml_writer(&detected, &mut writer, &opts) {
         Ok(s) => s,
         Err(e) => {
@@ -184,6 +193,15 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
         t_start.elapsed().as_secs_f64(),
     );
     ExitCode::SUCCESS
+}
+
+/// Directory for the writer's spool file: the directory of `output`, or
+/// the current directory when `output` is a bare file name.
+fn spool_dir_for(output: &Path) -> PathBuf {
+    match output.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),
+        _ => PathBuf::from("."),
+    }
 }
 
 fn open_writer(path: &Path) -> std::io::Result<Box<dyn Write>> {

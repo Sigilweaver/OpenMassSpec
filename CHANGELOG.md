@@ -91,6 +91,12 @@ All notable changes to this project will be documented in this file.
 - `read_arrow` raises if decoding fails partway through, instead of ending
   the stream early.
 - `mzdata` 0.65 -> 0.67 (CLI round-trip checks only).
+- `vendor2mzml convert` writes exact `<spectrumList count>` values and
+  consecutive `index` attributes (from `openmassspec-core` 3.0). The
+  writer holds encoded spectra until the run is read to the end, spilling
+  past 64 MiB to a temporary file; `convert` puts that file in the output
+  file's directory instead of the system temp dir, and removes it when
+  the conversion ends.
 
 ## [1.5.5] - 2026-09-17
 
