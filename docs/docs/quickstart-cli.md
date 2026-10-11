@@ -20,6 +20,26 @@ vendor2mzml convert sample.raw sample.mzML.gz
 hash, so downstream tools (mzML2HDF, ProteoWizard's `msconvert`,
 `MzIdentML` builders) can index-jump into the file.
 
+## Unreadable spectra
+
+A spectrum or chromatogram the vendor reader cannot decode is left out
+of the output by default. `convert` then prints a warning on stderr and
+still exits 0, because the file was written:
+
+```text
+warning: skipped 12 unreadable record(s) (12 spectra, 0 chromatograms); rerun with --strict to stop at the first one and see its error
+```
+
+`--strict` stops at the first unreadable record, prints its error, and
+exits 1; the output file is then incomplete.
+
+```sh
+vendor2mzml convert --strict sample.raw sample.mzML
+```
+
+`info` and `validate` always stop at the first unreadable spectrum and
+exit 1.
+
 ## Centroid on the way out
 
 ```sh
@@ -73,8 +93,11 @@ vendor2mzml convert sample.raw sample.mzML --profile json
 emits one JSON object on stderr after the conversion completes:
 
 ```json
-{"output":"sample.mzML","indexed":false,"spectra":3047,"elapsed_sec":0.812}
+{"output":"sample.mzML","indexed":false,"spectra":3047,"spectra_skipped":0,"chromatograms":2,"chromatograms_skipped":0,"elapsed_sec":0.812}
 ```
+
+`spectra` and `chromatograms` count what was written; the `_skipped`
+fields count unreadable records left out.
 
 Use `--profile text` for a human-readable variant.
 
@@ -106,7 +129,7 @@ piping into `jq`.
 
 | Code | Meaning                                                          |
 | ---- | ---------------------------------------------------------------- |
-| 0    | Success.                                                         |
-| 1    | I/O error, or `convert` failed (unsupported format / vendor).    |
+| 0    | Success. For `convert`, also when unreadable records were skipped (see the stderr warning). |
+| 1    | I/O error, unsupported format, an unreadable spectrum in `info`/`validate`, or `convert --strict` hit one. |
 | 2    | `validate`: input format was not recognised (clap errors also).  |
 | 3    | `validate`: the conformance harness rejected the input.          |

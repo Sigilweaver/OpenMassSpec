@@ -70,30 +70,49 @@ pip install openmassspec
 ### Convert a file
 
 ```sh
-vendor2mzml /data/sample.raw /tmp/sample.mzML --indexed
+vendor2mzml convert /data/sample.raw /tmp/sample.mzML --indexed
 ```
 
 `vendor2mzml` sniffs the format from the path (or directory layout for
 Bruker `.d/` and Waters `.raw/` bundles), routes through the matching
 vendor crate, and writes indexed PSI-MS mzML 1.1.0.
 
+A spectrum or chromatogram the reader cannot decode is left out of the
+output, and `convert` prints how many were skipped as a warning on
+stderr; it still exits 0 when the file was written. Pass `--strict` to
+stop at the first unreadable record instead (exit 1).
+
 ### From Rust
 
 ```rust
-use openmassspec_io::{detect_format, convert_to_mzml};
+use std::path::Path;
+use openmassspec_io::{convert_to_mzml, detect_format, ConvertOptions};
 
-let fmt = detect_format("sample.raw")?;
-println!("detected: {fmt:?}");
-convert_to_mzml("sample.raw", "sample.mzML", /* indexed */ true)?;
+let detected = detect_format(Path::new("sample.raw")).expect("supported format");
+println!("detected: {}", detected.format.name());
+let summary = convert_to_mzml(
+    &detected,
+    Path::new("sample.mzML"),
+    &ConvertOptions::new().with_indexed(true),
+)?;
+println!("{} spectra", summary.spectra_written);
 ```
+
+The library stops at the first unreadable record by default; see
+`ConvertOptions::with_record_error_policy` to skip instead.
 
 ### From Python
 
 ```python
 import openmassspec
 
-openmassspec.to_mzml("sample.raw", "sample.mzML", indexed=True)
+summary = openmassspec.to_mzml("sample.raw", "sample.mzML", indexed=True)
 ```
+
+`to_mzml` skips unreadable records by default, issues a `RuntimeWarning`
+with the count, and returns the written and skipped counts; pass
+`skip_unreadable=False` to raise instead. `iter_spectra`, `read_arrow`,
+and `read_chromatograms` always raise on an unreadable record.
 
 ## Documentation
 

@@ -2,22 +2,23 @@
 
 `openmassspec-core` is the shared Rust foundation every vendor parser in
 the stack builds on. It defines the vendor-neutral records, the
-`SpectrumSource` trait, the canonical mzML 1.1.0 writer, an optional
-Apache Arrow bridge, and the cross-vendor conformance harness.
+`SpectrumSource` trait, the canonical mzML 1.1.0 writer, and the
+cross-vendor conformance harness. The Apache Arrow bridge is the
+separate `openmassspec-arrow` crate.
 
 - Crate: [Sigilweaver/OpenMassSpecCore](https://github.com/Sigilweaver/OpenMassSpecCore)
 - License: Apache-2.0
-- MSRV: 1.85
+- MSRV: 1.88
 - `#![forbid(unsafe_code)]`
 
 ## Install
 
 ```toml
 [dependencies]
-openmassspec-core = "1"
+openmassspec-core = "3"
 
-# Optional: zero-copy Arrow RecordBatch builder.
-openmassspec-core = { version = "1", features = ["arrow"] }
+# Optional: Arrow RecordBatch builder.
+openmassspec-arrow = "3"
 ```
 
 ## The `SpectrumSource` trait
@@ -29,22 +30,24 @@ harness, the `openmassspec-io` umbrella, the `vendor2mzml` CLI -
 operates against `&mut dyn SpectrumSource`.
 
 ```rust
-use openmassspec_core::{RunMetadata, SpectrumRecord, ChromatogramRecord};
+use openmassspec_core::{ChromatogramIter, CvTerm, RunMetadata, SpectrumIter};
 
 pub trait SpectrumSource {
     fn run_metadata(&self) -> RunMetadata;
-    fn iter_spectra<'a>(&'a mut self)
-        -> Box<dyn Iterator<Item = SpectrumRecord> + 'a>;
-    fn iter_chromatograms<'a>(&'a mut self)
-        -> Box<dyn Iterator<Item = ChromatogramRecord> + 'a> {
+    // Box<dyn Iterator<Item = openmassspec_core::Result<SpectrumRecord>> + 'a>
+    fn iter_spectra<'a>(&'a mut self) -> SpectrumIter<'a>;
+    fn iter_chromatograms<'a>(&'a mut self) -> ChromatogramIter<'a> {
         Box::new(std::iter::empty())
     }
     fn spectrum_count_hint(&self) -> Option<usize> { None }
+    fn additional_processing_steps(&self) -> Vec<CvTerm> { Vec::new() }
 }
 ```
 
 Boxed iterators (rather than RPITIT) keep the trait dyn-compatible so
-the rest of the stack can hold `&mut dyn SpectrumSource`.
+the rest of the stack can hold `&mut dyn SpectrumSource`. Items are
+`Result`s: a record the parser cannot decode is an `Err`, never
+skipped.
 
 ## Public API
 
@@ -60,10 +63,10 @@ the rest of the stack can hold `&mut dyn SpectrumSource`.
 | `SpectrumSource`                                            | `source`        | Trait every parser implements.                                           |
 | `write_mzml`                                                | `mzml`          | Stream a `SpectrumSource` to a plain mzML 1.1.0 document.                |
 | `write_indexed_mzml`                                        | `mzml`          | Same, with `<indexList>` + SHA-1 footer for byte-offset indexing.        |
+| `write_mzml_with_options`, `WriteOptions`                   | `mzml`          | Compression and `RecordErrorPolicy` (fail or skip unreadable records).   |
+| `WriteSummary`                                              | `mzml`          | Records written and skipped by a write.                                  |
 | `conformance::assert_source_invariants`                     | `conformance`   | Check a live `SpectrumSource` for cross-vendor invariants.               |
 | `conformance::assert_iter_invariants`                       | `conformance`   | Same, but from any `IntoIterator<Item = SpectrumRecord>`.                |
-| `arrow::SpectrumBatchBuilder`                               | `arrow` (feat)  | Zero-copy builder for `arrow_array::RecordBatch` from a spectrum stream. |
-| `arrow::spectrum_record_schema`                             | `arrow` (feat)  | The canonical Arrow schema.                                              |
 | `Error`                                                     | `error`         | Aggregate `thiserror`-based error type.                                  |
 
 ## mzML writer
@@ -72,10 +75,11 @@ the rest of the stack can hold `&mut dyn SpectrumSource`.
 use openmassspec_core::{write_indexed_mzml, SpectrumSource};
 
 fn export<S: SpectrumSource>(mut src: S, path: &std::path::Path)
-    -> std::io::Result<()>
+    -> openmassspec_core::Result<()>
 {
     let mut out = std::fs::File::create(path)?;
-    write_indexed_mzml(&mut src, &mut out).map_err(std::io::Error::other)?;
+    let summary = write_indexed_mzml(&mut src, &mut out)?;
+    println!("{} spectra", summary.spectra_written);
     Ok(())
 }
 ```
@@ -103,12 +107,11 @@ println!("validated {count} spectra");
 The [`vendor2mzml validate`](./quickstart-cli.md#validate) subcommand
 runs this harness on any vendor input or pre-existing mzML.
 
-## Arrow bridge (feature: `arrow`)
+## Arrow bridge (crate: `openmassspec-arrow`)
 
 ```rust
-# #[cfg(feature = "arrow")]
 # fn _doc() -> Result<arrow_array::RecordBatch, arrow_schema::ArrowError> {
-use openmassspec_core::arrow::SpectrumBatchBuilder;
+use openmassspec_arrow::SpectrumBatchBuilder;
 
 // Pass the source's mobility_array_kind (None for instruments without
 // ion mobility); it applies to every row in the batch.
@@ -123,12 +126,6 @@ let batch = b.finish()?;
 
 The canonical schema is documented in
 [Arrow schema](./arrow-schema.md).
-
-## Feature flags
-
-| Flag    | Default | Effect                                                  |
-| ------- | :-----: | ------------------------------------------------------- |
-| `arrow` |    no   | Enables `arrow_array::RecordBatch` building from spectra. |
 
 ## Where it sits in the stack
 
