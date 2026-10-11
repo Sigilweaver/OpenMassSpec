@@ -4,9 +4,77 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-09-28
+## [2.0.0] - Unreleased
+
+### Breaking (Rust)
+
+- Requires `openmassspec-core` 3.0.0 and the reader releases built on it:
+  `opentfraw` 3.0.0, `opentimstdf` 3.0.0, `openwraw` 4.0.0, `openaraw`
+  1.0.0, `opensxraw` 0.4.0, `openszraw` 0.3.0. Their public types are
+  re-exported under `openmassspec_io::core` and `openmassspec_io::vendor`,
+  so their breaking changes are breaking here too.
+- The `arrow` feature now depends on `openmassspec-arrow` 3.0.0 and
+  `openmassspec_io::arrow` re-exports that crate (it was
+  `openmassspec_core::arrow`). Arrow types appear in the public API only
+  through this re-export.
+- Every function that took `Detected` by value takes `&Detected`:
+  `collect`, `collect_centroided`, `stream`, `stream_centroided`,
+  `metadata_only`, `collect_chromatograms`, `convert_to_mzml`,
+  `convert_to_mzml_writer`.
+- `convert_to_mzml(&Detected, &Path, &ConvertOptions)` and
+  `convert_to_mzml_writer(&Detected, &mut W, &ConvertOptions)` replace the
+  `indexed: bool` argument with `ConvertOptions` and return
+  `openmassspec_core::WriteSummary` instead of `()`.
+  `convert_to_mzml_centroided` and `convert_to_mzml_writer_centroided` are
+  removed; use `ConvertOptions::with_centroid` and
+  `with_centroid_min_intensity`.
+- `collect`, `collect_centroided`, `stream`, `stream_centroided`, and
+  `collect_chromatograms` return an error (`Error::Core`) for the first
+  spectrum or chromatogram the reader cannot decode. Previously the
+  readers dropped such records without notice.
+- `convert_to_mzml` stops at the first unreadable record by default.
+  `ConvertOptions::with_record_error_policy(RecordErrorPolicy::Skip)`
+  leaves such records out and counts them in the returned `WriteSummary`.
+- `Error`, `VendorFormat`, `Detected`, and `VecSource` are
+  `#[non_exhaustive]`. Build `Detected` with `Detected::new`; build
+  `VecSource` with `VecSource::new`; match `Error` and `VendorFormat` with
+  a wildcard arm.
+- `VecSource` implements the core 3.0 `SpectrumSource` (yields `Ok`
+  records).
+
+### Breaking (CLI)
+
+- `vendor2mzml convert` leaves out spectra and chromatograms the reader
+  cannot decode, prints the skipped count on stderr as a warning, and
+  exits 0 when the output was written. `--strict` stops at the first
+  unreadable record and exits 1. `info` and `validate` stop at the first
+  unreadable spectrum.
+- `convert --profile` output reports `spectra`, `spectra_skipped`,
+  `chromatograms`, and `chromatograms_skipped` from the write, and drops
+  the `validated` field (it was always `false`; `spectra` was always 0).
+
+### Changed (Python)
+
+- `to_mzml` takes `skip_unreadable=True`: unreadable records are left out,
+  a `RuntimeWarning` reports the count, and the call returns a dict with
+  `spectra_written`, `spectra_skipped`, `chromatograms_written`, and
+  `chromatograms_skipped` (it returned `None`). `skip_unreadable=False`
+  raises `RuntimeError` at the first one.
+- `iter_spectra`, `read_arrow`, and `read_chromatograms` raise
+  `RuntimeError` on an unreadable record instead of omitting it.
+- The metapackage extras and the CI parity install require the new reader
+  releases: `opentfraw>=3.0.0,<4`, `opentimstdf>=3.0.0,<4`,
+  `openwraw>=4.0.0,<5`, `openaraw>=1.0.0,<2`, `opensxraw>=0.4.0,<0.5`,
+  `openszraw>=0.3.0,<0.4`.
 
 ### Added
+
+- `ConvertOptions` (indexing, centroiding, compression, record-error
+  policy) and `with_source`, which opens the vendor source for a
+  `Detected` and passes it to a closure as `&mut dyn SpectrumSource`.
+- `Detected::new` to pair a path with a format without probing.
+- `convert_to_mzml` flushes its output file and reports a flush failure
+  instead of losing it on drop.
 
 - Python now exposes the complete shared spectrum and precursor fields, full
   run metadata, chromatograms, and the new Arrow vendor metadata columns for
@@ -18,13 +86,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Breaking (Rust):** adopts `openmassspec-core` 2.0.0 and arrow 60. Rust
-  code exchanging Arrow data with this crate must use arrow 60. The Python
-  API is unchanged apart from the additions above.
-- Requires the reader releases built on core 2.0.0: `opentfraw` 2.0.0,
-  `opentimstdf` 2.0.0, `openwraw` 3.0.0, `openaraw` 0.2.0, `opensxraw`
-  0.3.0, and `openszraw` 0.2.0. The metapackage extras pin the matching
-  major (or pre-1.0 minor) ranges.
+- Arrow data uses arrow 60. Rust code exchanging Arrow data with this
+  crate must use arrow 60.
 - `read_arrow` raises if decoding fails partway through, instead of ending
   the stream early.
 - `mzdata` 0.65 -> 0.67 (CLI round-trip checks only).
