@@ -1,0 +1,70 @@
+{% set name = "openmassspec-io" %}
+{% set version = "2.0.0" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  - url: https://github.com/Sigilweaver/OpenMassSpec/archive/refs/tags/v{{ version }}.tar.gz
+    # Fill in from the published tag; see packaging/README.md.
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000
+  # SCIEX test fixture (PXD022088, PRIDE, CC0), ~2.5 MB total; the same
+  # pair this repo's CI downloads. Used only by the test section below.
+  - url: https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff
+    # Fill in; see packaging/README.md.
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    folder: test-data
+  - url: https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff.scan
+    # Fill in; see packaging/README.md.
+    sha256: 0000000000000000000000000000000000000000000000000000000000000000
+    folder: test-data
+
+build:
+  number: 0
+  run_exports:
+    - {{ pin_subpackage(name, max_pin="x") }}
+
+requirements:
+  build:
+    - {{ compiler('rust') }}
+    # zstd-sys (via opentimstdf) compiles bundled C sources.
+    - {{ compiler('c') }}
+    - {{ stdlib('c') }}
+    - cargo-bundle-licenses
+
+test:
+  source_files:
+    - test-data/Rcor2KOESC1.wiff
+    - test-data/Rcor2KOESC1.wiff.scan
+  commands:
+    - vendor2mzml --help
+    - vendor2mzml --version
+    - vendor2mzml convert test-data/Rcor2KOESC1.wiff out.mzML --indexed
+    - test -s out.mzML
+    - vendor2mzml validate out.mzML
+
+about:
+  home: https://sigilweaver.app/openmassspec/
+  dev_url: https://github.com/Sigilweaver/OpenMassSpec
+  doc_url: https://sigilweaver.app/openmassspec/docs/
+  license: Apache-2.0
+  license_family: APACHE
+  license_file:
+    - LICENSE
+    - THIRDPARTY.yml
+  summary: "vendor2mzml: convert Thermo, Bruker, Waters, Agilent, SCIEX and Shimadzu raw acquisitions to mzML"
+  description: |
+    vendor2mzml (crate openmassspec-io-cli) reads vendor mass spectrometry
+    raw acquisitions (Thermo .raw, Bruker .d, Waters .raw, Agilent .d,
+    SCIEX .wiff, Shimadzu .qgd/.lcd) with pure-Rust readers and writes
+    PSI-MS mzML 1.1.0, optionally indexed or gzipped. No vendor SDKs.
+
+extra:
+  additional-platforms:
+    - linux-aarch64
+    - osx-arm64
+  recipe-maintainers:
+    - Nathan-D-R
+  identifiers:
+    - doi:10.5281/zenodo.20470595
