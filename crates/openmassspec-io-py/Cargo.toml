@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 
 [features]
 default = ["arrow"]
-arrow = ["openmassspec-io/arrow", "openmassspec-core/arrow", "dep:arrow"]
+arrow = ["openmassspec-io/arrow", "dep:arrow"]
 
 [dependencies]
 openmassspec-core = { workspace = true }

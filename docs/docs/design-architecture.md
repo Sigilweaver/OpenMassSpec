@@ -38,8 +38,11 @@ more than one vendor crate at a time.
   `SpectrumSource` and a `write_mzml(path, writer)` helper. They
   depend on `openmassspec-core` and zero other vendor crates.
 - **`openmassspec-io` is the only place that knows the full vendor
-  set.** Format detection, dispatch, and feature-gated re-exports
-  live here, behind the `thermo`, `bruker`, `waters` features.
+  set.** Format detection and dispatch live here, behind the
+  `thermo`, `bruker`, `waters`, `agilent`, `sciex`, `shimadzu`
+  features. The vendor crates are private dependencies: no vendor type
+  appears in its API, and vendor errors are carried boxed in
+  `Error::Reader`.
 - **`openmassspec-io-cli` and `openmassspec-io-py` depend on
   `openmassspec-io`.** They never call vendor crates directly; if they
   need something from a vendor, that something is promoted to the

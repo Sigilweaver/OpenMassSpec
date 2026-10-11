@@ -55,14 +55,14 @@ and `mobility_array_kind` stay null for every row).
 ## Building a batch
 
 ```rust,no_run
-use openmassspec_core::arrow::{spectrum_record_schema, SpectrumBatchBuilder};
+use openmassspec_arrow::{spectrum_record_schema, SpectrumBatchBuilder};
 use openmassspec_core::{MobilityArrayKind, SpectrumSource};
 use opentimstdf::mzml::TdfSource;
 
 let mut src = TdfSource::open("sample.d")?;
 let mut b = SpectrumBatchBuilder::new(Some(MobilityArrayKind::InverseReducedVsPerCm2));
 for s in src.iter_spectra() {
-    b.push(&s);
+    b.push(&s?);
 }
 let batch = b.finish()?;
 assert_eq!(batch.schema(), spectrum_record_schema());

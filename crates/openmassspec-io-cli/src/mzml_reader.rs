@@ -51,44 +51,16 @@ fn spectrum_to_record(stream_index: usize, s: RawSpectrum) -> SpectrumRecord {
     let intensity: Vec<f32> = s.intensities().into_owned();
     let precursor = s.precursor().map(|p| {
         let ion = p.ions.first();
-        PrecursorInfo {
-            target_mz: None,
-            selected_mz: ion.map(|x| x.mz),
-            isolation_width: None,
-            charge: ion.and_then(|x| x.charge),
-            intensity: ion.map(|x| f64::from(x.intensity)),
-            collision_energy: None,
-            ce_is_nce: false,
-            precursor_native_id: None,
-            activation: None,
-            analyzer: None,
-            ccs: None,
-        }
+        PrecursorInfo::default()
+            .with_selected_mz(ion.map(|x| x.mz))
+            .with_charge(ion.and_then(|x| x.charge))
+            .with_intensity(ion.map(|x| f64::from(x.intensity)))
     });
 
-    SpectrumRecord {
-        extra: ::std::collections::BTreeMap::new(),
-        acquisition_event_id: None,
-        index: s.index(),
-        scan_number: stream_index as u32 + 1,
-        native_id,
-        ms_level,
-        polarity,
-        scan_mode: None,
-        analyzer: None,
-        filter: None,
-        retention_time_sec: rt_sec,
-        total_ion_current: None,
-        base_peak_mz: None,
-        base_peak_intensity: None,
-        low_mz: None,
-        high_mz: None,
-        ion_injection_time_ms: None,
-        inv_mobility: None,
-        faims_cv: None,
-        precursor,
-        mz,
-        intensity,
-        inv_mobility_per_peak: None,
-    }
+    SpectrumRecord::new(s.index(), stream_index as u32 + 1, native_id)
+        .with_ms_level(ms_level)
+        .with_polarity(polarity)
+        .with_retention_time_sec(rt_sec)
+        .with_precursor(precursor)
+        .with_peaks(mz, intensity)
 }

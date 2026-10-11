@@ -35,13 +35,13 @@ dependencies = ["openmassspec-io>=2.0.0,<3"]
 # compiled in, so reading and mzML conversion work for all supported
 # formats out of the box. Each extra additionally installs the standalone
 # per-vendor package for direct use.
-thermo = ["opentfraw>=2.0.0,<3"]
-bruker = ["opentimstdf>=2.0.0,<3"]
-waters = ["openwraw>=3.0.0,<4"]
-agilent = ["openaraw>=0.2.0,<1"]
-sciex = ["opensxraw>=0.3.0,<1"]
-shimadzu = ["openszraw>=0.2.0,<1"]
-all = ["opentfraw>=2.0.0,<3", "opentimstdf>=2.0.0,<3", "openwraw>=3.0.0,<4", "openaraw>=0.2.0,<1", "opensxraw>=0.3.0,<1", "openszraw>=0.2.0,<1"]
+thermo = ["opentfraw>=3.0.0,<4"]
+bruker = ["opentimstdf>=3.0.0,<4"]
+waters = ["openwraw>=4.0.0,<5"]
+agilent = ["openaraw>=1.0.0,<2"]
+sciex = ["opensxraw>=0.4.0,<0.5"]
+shimadzu = ["openszraw>=0.3.0,<0.4"]
+all = ["opentfraw>=3.0.0,<4", "opentimstdf>=3.0.0,<4", "openwraw>=4.0.0,<5", "openaraw>=1.0.0,<2", "opensxraw>=0.4.0,<0.5", "openszraw>=0.3.0,<0.4"]
 
 [project.urls]
 Homepage = "https://github.com/Sigilweaver/OpenMassSpec"

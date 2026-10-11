@@ -20,71 +20,48 @@ fn bin_path() -> PathBuf {
 }
 
 fn make_metadata() -> RunMetadata {
-    RunMetadata {
-        extra: ::std::collections::BTreeMap::new(),
-        source_file_name: "synthetic.raw".into(),
-        source_file_format: CvTerm::new("MS:1000563", "Thermo RAW format"),
-        native_id_format: CvTerm::new("MS:1000768", "Thermo nativeID format"),
-        instrument: CvTerm::new("MS:1000031", "instrument model"),
-        instrument_serial_number: None,
-        software_name: "openmassspec-io-cli-test".into(),
-        software_version: "0.0.0".into(),
-        start_timestamp: None,
-        mobility_array_kind: None,
-        analyzers: Vec::new(),
-        acquisition_software_name: None,
-        acquisition_software_version: None,
-    }
+    RunMetadata::new(
+        "synthetic.raw",
+        CvTerm::new("MS:1000563", "Thermo RAW format"),
+        CvTerm::new("MS:1000768", "Thermo nativeID format"),
+        CvTerm::new("MS:1000031", "instrument model"),
+        "openmassspec-io-cli-test",
+        "0.0.0",
+    )
 }
 
 fn make_record(index: usize, scan: u32, ms_level: u32, rt_sec: f64) -> SpectrumRecord {
-    let mz = vec![100.0, 200.0, 300.0];
-    let intensity = vec![10.0f32, 20.0, 30.0];
-    let precursor = if ms_level >= 2 {
-        Some(PrecursorInfo {
-            target_mz: Some(150.0),
-            selected_mz: Some(150.0),
-            isolation_width: Some(2.0),
-            charge: Some(2),
-            intensity: Some(1.0e5),
-            collision_energy: Some(28.0),
-            ce_is_nce: true,
-            precursor_native_id: Some(format!(
+    let precursor = (ms_level >= 2).then(|| {
+        PrecursorInfo::default()
+            .with_target_mz(150.0)
+            .with_selected_mz(150.0)
+            .with_isolation_width(2.0)
+            .with_charge(2)
+            .with_intensity(1.0e5)
+            .with_collision_energy(28.0)
+            .with_ce_is_nce(true)
+            .with_precursor_native_id(format!(
                 "controllerType=0 controllerNumber=1 scan={}",
                 scan - 1
-            )),
-            activation: Some(openmassspec_core::Activation::HCD),
-            analyzer: None,
-            ccs: None,
-        })
-    } else {
-        None
-    };
-    SpectrumRecord {
-        extra: ::std::collections::BTreeMap::new(),
-        acquisition_event_id: None,
+            ))
+            .with_activation(openmassspec_core::Activation::HCD)
+    });
+    SpectrumRecord::new(
         index,
-        scan_number: scan,
-        native_id: format!("controllerType=0 controllerNumber=1 scan={scan}"),
-        ms_level,
-        polarity: Some(Polarity::Positive),
-        scan_mode: Some(openmassspec_core::ScanMode::Centroid),
-        analyzer: None,
-        filter: None,
-        retention_time_sec: rt_sec,
-        total_ion_current: Some(60.0),
-        base_peak_mz: Some(300.0),
-        base_peak_intensity: Some(30.0),
-        low_mz: Some(100.0),
-        high_mz: Some(300.0),
-        ion_injection_time_ms: None,
-        inv_mobility: None,
-        faims_cv: None,
-        precursor,
-        mz,
-        intensity,
-        inv_mobility_per_peak: None,
-    }
+        scan,
+        format!("controllerType=0 controllerNumber=1 scan={scan}"),
+    )
+    .with_ms_level(ms_level)
+    .with_polarity(Polarity::Positive)
+    .with_scan_mode(openmassspec_core::ScanMode::Centroid)
+    .with_retention_time_sec(rt_sec)
+    .with_total_ion_current(60.0)
+    .with_base_peak_mz(300.0)
+    .with_base_peak_intensity(30.0)
+    .with_low_mz(100.0)
+    .with_high_mz(300.0)
+    .with_precursor(precursor)
+    .with_peaks(vec![100.0, 200.0, 300.0], vec![10.0f32, 20.0, 30.0])
 }
 
 fn write_good_mzml(path: &std::path::Path) {

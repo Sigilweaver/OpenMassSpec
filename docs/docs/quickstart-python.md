@@ -39,8 +39,17 @@ import openmassspec as op
 det = op.detect_format("sample.raw")
 print(det.vendor, det.path)        # 'thermo' /path/to/sample.raw
 
-op.to_mzml("sample.raw", "sample.mzML", indexed=True)
+summary = op.to_mzml("sample.raw", "sample.mzML", indexed=True)
+print(summary["spectra_written"], summary["spectra_skipped"])
 ```
+
+`to_mzml` leaves out spectra and chromatograms the reader cannot decode
+(`skip_unreadable=True`, the default), issues a `RuntimeWarning` with
+the count, and returns a dict with `spectra_written`, `spectra_skipped`,
+`chromatograms_written`, and `chromatograms_skipped`. Pass
+`skip_unreadable=False` to raise `RuntimeError` at the first unreadable
+record. `iter_spectra`, `read_arrow`, and `read_chromatograms` always
+raise on an unreadable record.
 
 The functions `detect_format`, `to_mzml`, `iter_spectra`, and the
 `Spectrum` class are re-exported from `openmassspec_io`. You can also

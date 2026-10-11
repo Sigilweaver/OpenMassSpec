@@ -56,10 +56,29 @@ def test_to_mzml_roundtrip(vendor: str, tmp_path: Path):
     if path is None:
         pytest.skip(f"no corpus for {vendor}")
     out = tmp_path / f"{vendor}.mzML"
-    opio.to_mzml(str(path), str(out), indexed=True)
+    summary = opio.to_mzml(str(path), str(out), indexed=True)
     head = out.read_bytes()[:512]
     assert b"<indexedmzML" in head or b"<mzML" in head
     assert out.stat().st_size > 1024
+    assert summary["spectra_written"] > 0
+    assert set(summary) == {
+        "spectra_written",
+        "spectra_skipped",
+        "chromatograms_written",
+        "chromatograms_skipped",
+    }
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_to_mzml_strict_matches_default_on_clean_input(vendor: str, tmp_path: Path):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    default = opio.to_mzml(str(path), str(tmp_path / "a.mzML"))
+    if default["spectra_skipped"] or default["chromatograms_skipped"]:
+        pytest.skip("fixture has unreadable records")
+    strict = opio.to_mzml(str(path), str(tmp_path / "b.mzML"), skip_unreadable=False)
+    assert strict == default
 
 
 @pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])

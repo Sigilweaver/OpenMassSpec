@@ -20,6 +20,42 @@ vendor2mzml convert sample.raw sample.mzML.gz
 hash, so downstream tools (mzML2HDF, ProteoWizard's `msconvert`,
 `MzIdentML` builders) can index-jump into the file.
 
+## Disk space
+
+`<spectrumList count>` must hold the number of spectra actually written,
+which is known only after the last one. The writer therefore holds the
+encoded spectra until the run is read to the end: in memory up to 64 MiB,
+then in a temporary file in the output file's directory. The file is
+removed when the conversion ends, successful or not. While a large
+conversion runs, that directory needs room for the output plus the
+uncompressed spectra (for `.mzML.gz` output the spool is not gzipped).
+
+## Unreadable spectra
+
+A spectrum or chromatogram the vendor reader cannot decode is left out
+of the output by default. `convert` then prints a warning on stderr and
+still exits 0, because the file was written:
+
+```text
+warning: skipped 12 unreadable record(s) (12 spectra, 0 chromatograms); rerun with --strict to stop at the first one and see its error
+```
+
+`--strict` stops at the first unreadable record, prints its error, and
+exits 1. The partial output file is kept, and stderr says it is
+incomplete:
+
+```text
+error: thermo reader: scan data record ending at offset 0x5a7dcb does not match a known layout
+  sample.mzML is incomplete
+```
+
+```sh
+vendor2mzml convert --strict sample.raw sample.mzML
+```
+
+`info` and `validate` always stop at the first unreadable spectrum and
+exit 1.
+
 ## Centroid on the way out
 
 ```sh
@@ -73,8 +109,11 @@ vendor2mzml convert sample.raw sample.mzML --profile json
 emits one JSON object on stderr after the conversion completes:
 
 ```json
-{"output":"sample.mzML","indexed":false,"spectra":3047,"elapsed_sec":0.812}
+{"output":"sample.mzML","indexed":false,"spectra":3047,"spectra_skipped":0,"chromatograms":2,"chromatograms_skipped":0,"elapsed_sec":0.812}
 ```
+
+`spectra` and `chromatograms` count what was written; the `_skipped`
+fields count unreadable records left out.
 
 Use `--profile text` for a human-readable variant.
 
@@ -106,7 +145,7 @@ piping into `jq`.
 
 | Code | Meaning                                                          |
 | ---- | ---------------------------------------------------------------- |
-| 0    | Success.                                                         |
-| 1    | I/O error, or `convert` failed (unsupported format / vendor).    |
+| 0    | Success. For `convert`, also when unreadable records were skipped (see the stderr warning). |
+| 1    | I/O error, unsupported format, an unreadable spectrum in `info`/`validate`, or `convert --strict` hit one. |
 | 2    | `validate`: input format was not recognised (clap errors also).  |
 | 3    | `validate`: the conformance harness rejected the input.          |

@@ -17,13 +17,14 @@ homepage = "https://sigilweaver.app/openmassspec/"
 documentation = "https://sigilweaver.app/openmassspec/docs/"
 
 [workspace.dependencies]
-openmassspec-core = "2.0.0"
-opentfraw = "2.0.0"
-opentimstdf = "2.0.0"
-openwraw = "3.0.0"
-openaraw = "0.2.0"
-opensxraw = "0.3.0"
-openszraw = "0.2.0"
+openmassspec-core = "3.0.0"
+openmassspec-arrow = "3.0.0"
+opentfraw = "3.0.0"
+opentimstdf = "3.0.0"
+openwraw = "4.0.0"
+openaraw = "1.0.0"
+opensxraw = "0.4.0"
+openszraw = "0.3.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
