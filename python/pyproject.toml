@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,8 @@ name = "openmassspec"
 version = "2.0.0"
 description = "Open mass spectrometry: one install for the OpenMassSpec vendor reader stack (Thermo, Bruker, Waters, Agilent, SCIEX, Shimadzu)"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
 requires-python = ">=3.9"
 keywords = [
@@ -22,7 +23,6 @@ keywords = [
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Rust",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
@@ -52,4 +52,3 @@ Issues = "https://github.com/Sigilweaver/OpenMassSpec/issues"
 [tool.setuptools]
 packages = ["openmassspec"]
 package-dir = { "" = "." }
-license-files = ["LICENSE"]

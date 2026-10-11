@@ -38,4 +38,4 @@ run  = openmassspec.open_run("/data/sample.raw")    # vendor-specific reader obj
 
 ## License
 
-Apache-2.0. See [`LICENSE`](../LICENSE).
+Apache-2.0. See [`LICENSE`](https://github.com/Sigilweaver/OpenMassSpec/blob/main/LICENSE).
