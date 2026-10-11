@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Every vendor source yields `Result` records: a spectrum or chromatogram
 the reader cannot decode is an `Err`, never silently dropped.
 `convert_to_mzml`, `collect`, and `stream` stop at the first one and
-return it as `openmassspec_io::Error::Core`. To write everything that
+return it as `openmassspec_io::Error::Reader`. To write everything that
 can be read and leave the rest out, select the skip policy and report
 the count to your users:
 
@@ -57,6 +57,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Reader-specific errors
+
+Every reader failure, whether opening the input or decoding a record, is
+`Error::Reader { vendor, source }`, where `source` is the reader crate's
+own error boxed as `dyn std::error::Error`. The reader crates are not
+re-exported, so `openmassspec-io`'s API does not change when a reader
+releases a new major version. To inspect reader-specific detail, depend
+on that reader crate directly and downcast `Error::reader_error()`:
+
+```rust,ignore
+// Cargo.toml: opentfraw = "3" alongside openmassspec-io.
+match openmassspec_io::collect(&detected) {
+    Ok((records, _meta)) => println!("{} spectra", records.len()),
+    Err(err) => {
+        match err.reader_error().and_then(|e| e.downcast_ref::<opentfraw::Error>()) {
+            Some(thermo_err) => eprintln!("opentfraw: {thermo_err:?}"),
+            None => eprintln!("error: {err}"),
+        }
+    }
+}
+```
+
+`Error::reader_vendor()` returns the vendor name (`"thermo"`, ...) without
+downcasting.
 
 ## Centroid on the way out
 

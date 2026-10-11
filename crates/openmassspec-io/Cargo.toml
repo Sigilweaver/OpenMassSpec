@@ -1,7 +1,7 @@
 [package]
 name = "openmassspec-io"
 version.workspace = true
-description = "Vendor-neutral mass-spec I/O: feature-gated re-exports of opentfraw / opentimstdf / openwraw / openaraw / opensxraw / openszraw with auto-detection and an mzML writer."
+description = "Vendor-neutral mass-spec I/O: auto-detection and mzML conversion over the feature-gated opentfraw / opentimstdf / openwraw / openaraw / opensxraw / openszraw readers."
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true

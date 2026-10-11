@@ -64,9 +64,10 @@ struct ConvertArgs {
     /// set. Ignored otherwise.
     #[arg(long)]
     centroid_min_intensity: Option<f32>,
-    /// Fail at the first spectrum or chromatogram that cannot be decoded.
-    /// By default unreadable records are left out of the output and their
-    /// count is printed on stderr as a warning.
+    /// Fail at the first spectrum or chromatogram that cannot be decoded
+    /// (exit 1; the partial output file is kept and reported as
+    /// incomplete). By default unreadable records are left out of the
+    /// output and their count is printed on stderr as a warning.
     #[arg(long)]
     strict: bool,
     /// Emit timing and record counts on stderr in the chosen format.

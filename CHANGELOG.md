@@ -10,9 +10,20 @@ All notable changes to this project will be documented in this file.
 
 - Requires `openmassspec-core` 3.0.0 and the reader releases built on it:
   `opentfraw` 3.0.0, `opentimstdf` 3.0.0, `openwraw` 4.0.0, `openaraw`
-  1.0.0, `opensxraw` 0.4.0, `openszraw` 0.3.0. Their public types are
-  re-exported under `openmassspec_io::core` and `openmassspec_io::vendor`,
-  so their breaking changes are breaking here too.
+  1.0.0, `opensxraw` 0.4.0, `openszraw` 0.3.0. Core is re-exported as
+  `openmassspec_io::core`.
+- The `vendor` module (re-exports of the six reader crates) is removed.
+  The readers are private dependencies, and no reader type is part of the
+  public API, so a reader major release no longer forces a new
+  `openmassspec-io` major. Depend on a reader crate directly to use it.
+- The per-reader `Error` variants (`Thermo`, `Bruker`, `Waters`,
+  `Agilent`, `Sciex`, `Shimadzu`) are replaced by
+  `Error::Reader { vendor, source }`, with the reader's error boxed as
+  `BoxError`. It covers both open failures and unreadable records
+  (which were `Error::Core`). `Error::reader_error()` returns the boxed
+  error for `downcast_ref`, `Error::reader_vendor()` the vendor name, and
+  `Error::reader(vendor, err)` builds one. `Error::Core` now holds only
+  writer and conformance errors from core.
 - The `arrow` feature now depends on `openmassspec-arrow` 3.0.0 and
   `openmassspec_io::arrow` re-exports that crate (it was
   `openmassspec_core::arrow`). Arrow types appear in the public API only
@@ -29,7 +40,7 @@ All notable changes to this project will be documented in this file.
   removed; use `ConvertOptions::with_centroid` and
   `with_centroid_min_intensity`.
 - `collect`, `collect_centroided`, `stream`, `stream_centroided`, and
-  `collect_chromatograms` return an error (`Error::Core`) for the first
+  `collect_chromatograms` return an error (`Error::Reader`) for the first
   spectrum or chromatogram the reader cannot decode. Previously the
   readers dropped such records without notice.
 - `convert_to_mzml` stops at the first unreadable record by default.
@@ -47,7 +58,8 @@ All notable changes to this project will be documented in this file.
 - `vendor2mzml convert` leaves out spectra and chromatograms the reader
   cannot decode, prints the skipped count on stderr as a warning, and
   exits 0 when the output was written. `--strict` stops at the first
-  unreadable record and exits 1. `info` and `validate` stop at the first
+  unreadable record, exits 1, keeps the partial output file, and says on
+  stderr that it is incomplete. `info` and `validate` stop at the first
   unreadable spectrum.
 - `convert --profile` output reports `spectra`, `spectra_skipped`,
   `chromatograms`, and `chromatograms_skipped` from the write, and drops

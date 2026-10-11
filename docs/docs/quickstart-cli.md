@@ -41,7 +41,13 @@ warning: skipped 12 unreadable record(s) (12 spectra, 0 chromatograms); rerun wi
 ```
 
 `--strict` stops at the first unreadable record, prints its error, and
-exits 1; the output file is then incomplete.
+exits 1. The partial output file is kept, and stderr says it is
+incomplete:
+
+```text
+error: thermo reader: scan data record ending at offset 0x5a7dcb does not match a known layout
+  sample.mzML is incomplete
+```
 
 ```sh
 vendor2mzml convert --strict sample.raw sample.mzML

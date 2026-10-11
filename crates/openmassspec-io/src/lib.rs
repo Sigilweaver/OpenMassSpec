@@ -4,9 +4,12 @@
 //! vendor-detection + mzML-conversion API.
 //!
 //! Each vendor parser is gated behind a Cargo feature
-//! (`thermo`, `bruker`, `waters`, `agilent`, `sciex`, `shimadzu`) and
-//! re-exported under [`vendor`]. The `all` meta-feature pulls in every
-//! supported vendor. The `arrow` feature re-exports
+//! (`thermo`, `bruker`, `waters`, `agilent`, `sciex`, `shimadzu`); the
+//! `all` meta-feature pulls in every supported vendor. The reader crates
+//! are private dependencies: no reader type appears in this crate's API,
+//! so a reader's major release does not change it. Reader errors arrive
+//! as [`Error::Reader`]; [`Error::reader_error`] gives the reader's own
+//! error for downcasting. The `arrow` feature re-exports
 //! [`openmassspec-arrow`](https://docs.rs/openmassspec-arrow) as
 //! [`arrow`]; no Arrow type appears anywhere else in this crate's API.
 //!
@@ -60,7 +63,7 @@ use openmassspec_core::{
 };
 
 mod error;
-pub use error::{Error, Result};
+pub use error::{BoxError, Error, Result};
 
 pub use openmassspec_core as core;
 
@@ -68,22 +71,6 @@ pub use openmassspec_core as core;
 /// the Arrow schema and `RecordBatch` builder for spectrum records.
 #[cfg(feature = "arrow")]
 pub use openmassspec_arrow as arrow;
-
-/// Re-exports of each vendor parser, gated by feature.
-pub mod vendor {
-    #[cfg(feature = "agilent")]
-    pub use openaraw;
-    #[cfg(feature = "sciex")]
-    pub use opensxraw;
-    #[cfg(feature = "shimadzu")]
-    pub use openszraw;
-    #[cfg(feature = "thermo")]
-    pub use opentfraw;
-    #[cfg(feature = "bruker")]
-    pub use opentimstdf;
-    #[cfg(feature = "waters")]
-    pub use openwraw;
-}
 
 /// Detected on-disk vendor / format family.
 ///
@@ -263,9 +250,27 @@ fn read_prefix<const N: usize>(path: &Path) -> Option<[u8; N]> {
 ///
 /// # Errors
 ///
-/// [`Error::FeatureDisabled`] when the vendor's feature is off, the vendor
-/// reader's error when the input cannot be opened, or whatever `f`
-/// returns.
+/// [`Error::FeatureDisabled`] when the vendor's feature is off,
+/// [`Error::Reader`] when the input cannot be opened, or whatever `f`
+/// returns. An `openmassspec_core::Error::Vendor` that `f` returns (an
+/// unreadable record) is reported as [`Error::Reader`] for this vendor.
+pub fn with_source<T>(
+    detected: &Detected,
+    f: impl FnOnce(&mut dyn SpectrumSource) -> Result<T>,
+) -> Result<T> {
+    let vendor = detected.format.name();
+    with_source_inner(detected, f).map_err(|e| e.attribute_to(vendor))
+}
+
+/// Error mapper for a vendor reader's own error type.
+#[allow(dead_code)]
+fn reader_err<E>(vendor: &'static str) -> impl FnOnce(E) -> Error
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    move |e| Error::reader(vendor, e)
+}
+
 #[cfg_attr(
     not(all(
         feature = "thermo",
@@ -277,7 +282,7 @@ fn read_prefix<const N: usize>(path: &Path) -> Option<[u8; N]> {
     )),
     allow(unused_variables)
 )]
-pub fn with_source<T>(
+fn with_source_inner<T>(
     detected: &Detected,
     f: impl FnOnce(&mut dyn SpectrumSource) -> Result<T>,
 ) -> Result<T> {
@@ -286,7 +291,8 @@ pub fn with_source<T>(
         VendorFormat::ThermoRaw => {
             #[cfg(feature = "thermo")]
             {
-                let raw = opentfraw::RawFileReader::open_path(path)?;
+                let raw =
+                    opentfraw::RawFileReader::open_path(path).map_err(reader_err("thermo"))?;
                 let mut file =
                     std::io::BufReader::with_capacity(2 << 20, std::fs::File::open(path)?);
                 let filename = path
@@ -302,7 +308,7 @@ pub fn with_source<T>(
         VendorFormat::BrukerTdf => {
             #[cfg(feature = "bruker")]
             {
-                f(&mut opentimstdf::mzml::TdfSource::open(path)?)
+                f(&mut opentimstdf::mzml::TdfSource::open(path).map_err(reader_err("bruker"))?)
             }
             #[cfg(not(feature = "bruker"))]
             Err(Error::FeatureDisabled { vendor: "bruker" })
@@ -310,7 +316,7 @@ pub fn with_source<T>(
         VendorFormat::WatersRaw => {
             #[cfg(feature = "waters")]
             {
-                f(&mut openwraw::mzml::WatersSource::open(path)?)
+                f(&mut openwraw::mzml::WatersSource::open(path).map_err(reader_err("waters"))?)
             }
             #[cfg(not(feature = "waters"))]
             Err(Error::FeatureDisabled { vendor: "waters" })
@@ -318,7 +324,7 @@ pub fn with_source<T>(
         VendorFormat::AgilentMassHunter => {
             #[cfg(feature = "agilent")]
             {
-                f(&mut openaraw::reader::Reader::open(path)?)
+                f(&mut openaraw::reader::Reader::open(path).map_err(reader_err("agilent"))?)
             }
             #[cfg(not(feature = "agilent"))]
             Err(Error::FeatureDisabled { vendor: "agilent" })
@@ -326,7 +332,7 @@ pub fn with_source<T>(
         VendorFormat::SciexWiff => {
             #[cfg(feature = "sciex")]
             {
-                f(&mut opensxraw::reader::Reader::open(path)?)
+                f(&mut opensxraw::reader::Reader::open(path).map_err(reader_err("sciex"))?)
             }
             #[cfg(not(feature = "sciex"))]
             Err(Error::FeatureDisabled { vendor: "sciex" })
@@ -334,7 +340,7 @@ pub fn with_source<T>(
         VendorFormat::ShimadzuLabSolutions => {
             #[cfg(feature = "shimadzu")]
             {
-                f(&mut openszraw::reader::Reader::open(path)?)
+                f(&mut openszraw::reader::Reader::open(path).map_err(reader_err("shimadzu"))?)
             }
             #[cfg(not(feature = "shimadzu"))]
             Err(Error::FeatureDisabled { vendor: "shimadzu" })
@@ -879,6 +885,11 @@ mod tests {
     fn collect_and_stream_surface_unreadable_records() {
         let err = collect_from(&mut OneBad).unwrap_err();
         assert!(matches!(err, Error::Core(_)), "{err:?}");
+        let source = err.reader_error().expect("reader error");
+        assert!(source.downcast_ref::<std::io::Error>().is_some());
+        let err = err.attribute_to("thermo");
+        assert_eq!(err.reader_vendor(), Some("thermo"));
+        assert!(err.to_string().starts_with("thermo reader: "), "{err}");
         assert!(err.to_string().contains("scan 2 truncated"));
 
         let mut seen = 0;
