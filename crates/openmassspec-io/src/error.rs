@@ -8,7 +8,13 @@
 use std::path::PathBuf;
 
 /// Errors produced by the umbrella `openmassspec-io` API.
+///
+/// A record the vendor reader cannot decode arrives as [`Error::Core`]
+/// (wrapping `openmassspec_core::Error::Vendor`); errors opening an input
+/// arrive as the vendor variant. New variants may be added in minor
+/// releases; match with a wildcard arm.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The path did not match any supported vendor signature.
     #[error("unsupported vendor format at {0}")]
@@ -17,13 +23,17 @@ pub enum Error {
     /// A vendor format was detected but its feature was not enabled at
     /// build time.
     #[error("openmassspec-io was built without the '{vendor}' feature")]
-    FeatureDisabled { vendor: &'static str },
+    FeatureDisabled {
+        /// Vendor name as returned by [`VendorFormat::name`](crate::VendorFormat::name).
+        vendor: &'static str,
+    },
 
     /// Wrapping I/O error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    /// Wrapping `openmassspec-core` error.
+    /// Wrapping `openmassspec-core` error: an unreadable record, or a
+    /// writer failure.
     #[error(transparent)]
     Core(#[from] openmassspec_core::Error),
 
@@ -57,8 +67,9 @@ pub enum Error {
     #[error(transparent)]
     Shimadzu(#[from] openszraw::Error),
 
-    /// mzML parsing error. Kept as a string until `mzdata` exposes a
-    /// typed error suitable for `#[from]`.
+    /// Error reading an mzML file (used by the `vendor2mzml validate`
+    /// mzML path). A message rather than a typed source so this crate does
+    /// not depend on an mzML parser.
     #[error("mzML error: {0}")]
     Mzml(String),
 

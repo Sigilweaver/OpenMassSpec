@@ -124,7 +124,8 @@ fn smoke(input: PathBuf) {
         input_tag(&input),
         std::process::id()
     ));
-    openmassspec_io::convert_to_mzml(det, &out, false).expect("convert");
+    openmassspec_io::convert_to_mzml(&det, &out, &openmassspec_io::ConvertOptions::new())
+        .expect("convert");
     let bytes = fs::read(&out).expect("read");
     assert!(
         bytes.len() > 4096,
@@ -180,7 +181,7 @@ fn sciex_smoke() {
     smoke(sciex_fixture());
 }
 
-/// After `convert_to_mzml_centroided`, no spectrum in the output should
+/// After converting with `ConvertOptions::with_centroid`, no spectrum in the output should
 /// still be tagged profile mode - every profile spectrum was centroided,
 /// and every already-centroid spectrum passed through unchanged. This
 /// holds regardless of the input file's actual mode mix, so it's a
@@ -197,7 +198,12 @@ fn centroid_smoke(input: PathBuf) {
         input_tag(&input),
         std::process::id()
     ));
-    openmassspec_io::convert_to_mzml_centroided(det, &out, false, None).expect("convert");
+    openmassspec_io::convert_to_mzml(
+        &det,
+        &out,
+        &openmassspec_io::ConvertOptions::new().with_centroid(true),
+    )
+    .expect("convert");
     let text = fs::read_to_string(&out).expect("read");
     assert!(
         !text.contains(r#"accession="MS:1000128""#),
@@ -254,10 +260,10 @@ fn stream_matches_collect(input: PathBuf) {
     }
     let det = openmassspec_io::detect_format(&input).expect("detect");
 
-    let (collected, collect_meta) = openmassspec_io::collect(det.clone()).expect("collect");
+    let (collected, collect_meta) = openmassspec_io::collect(&det).expect("collect");
 
     let mut streamed = Vec::new();
-    let stream_meta = openmassspec_io::stream(det.clone(), |rec| {
+    let stream_meta = openmassspec_io::stream(&det, |rec| {
         streamed.push(rec);
         Ok(())
     })
@@ -271,7 +277,7 @@ fn stream_matches_collect(input: PathBuf) {
         assert_eq!(a.intensity, b.intensity);
     }
 
-    let meta_only = openmassspec_io::metadata_only(det).expect("metadata_only");
+    let meta_only = openmassspec_io::metadata_only(&det).expect("metadata_only");
     assert_eq!(meta_only.instrument.name, collect_meta.instrument.name);
     assert_eq!(meta_only.source_file_name, collect_meta.source_file_name);
     assert_eq!(stream_meta.instrument.name, collect_meta.instrument.name);

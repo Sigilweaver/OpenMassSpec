@@ -21,10 +21,11 @@ waters = ["dep:openwraw"]
 agilent = ["dep:openaraw"]
 sciex = ["dep:opensxraw"]
 shimadzu = ["dep:openszraw"]
-arrow = ["openmassspec-core/arrow"]
+arrow = ["dep:openmassspec-arrow"]
 
 [dependencies]
 openmassspec-core = { workspace = true }
+openmassspec-arrow = { workspace = true, optional = true }
 opentfraw = { workspace = true, optional = true }
 opentimstdf = { workspace = true, optional = true }
 openwraw = { workspace = true, optional = true }

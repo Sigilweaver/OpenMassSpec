@@ -15,10 +15,9 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use openmassspec_core::conformance::assert_iter_invariants;
-use openmassspec_core::SpectrumRecord;
+use openmassspec_core::{RecordErrorPolicy, SpectrumRecord, WriteSummary};
 use openmassspec_io::{
-    collect, collect_centroided, convert_to_mzml_writer, convert_to_mzml_writer_centroided,
-    detect_format, Detected,
+    collect, collect_centroided, convert_to_mzml_writer, detect_format, ConvertOptions, Detected,
 };
 
 #[derive(Parser, Debug)]
@@ -65,6 +64,11 @@ struct ConvertArgs {
     /// set. Ignored otherwise.
     #[arg(long)]
     centroid_min_intensity: Option<f32>,
+    /// Fail at the first spectrum or chromatogram that cannot be decoded.
+    /// By default unreadable records are left out of the output and their
+    /// count is printed on stderr as a warning.
+    #[arg(long)]
+    strict: bool,
     /// Emit timing and record counts on stderr in the chosen format.
     #[arg(long, value_enum)]
     profile: Option<ProfileFormat>,
@@ -149,30 +153,34 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let convert_result = if args.centroid {
-        convert_to_mzml_writer_centroided(
-            detected,
-            &mut writer,
-            args.indexed,
-            args.centroid_min_intensity,
-        )
+    let policy = if args.strict {
+        RecordErrorPolicy::Fail
     } else {
-        convert_to_mzml_writer(detected, &mut writer, args.indexed)
+        RecordErrorPolicy::Skip
     };
-    if let Err(e) = convert_result {
-        eprintln!("error: {e}");
-        return ExitCode::from(1);
-    }
+    let opts = ConvertOptions::new()
+        .with_indexed(args.indexed)
+        .with_centroid(args.centroid)
+        .with_centroid_min_intensity(args.centroid_min_intensity)
+        .with_record_error_policy(policy);
+    let summary = match convert_to_mzml_writer(&detected, &mut writer, &opts) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error: {e}");
+            eprintln!("  {} is incomplete", args.output.display());
+            return ExitCode::from(1);
+        }
+    };
     if let Err(e) = writer.flush() {
         eprintln!("error: flush: {e}");
         return ExitCode::from(1);
     }
+    warn_skipped(&summary);
     report(
         args.profile,
         &args.output,
         args.indexed,
-        0,
-        false,
+        &summary,
         t_start.elapsed().as_secs_f64(),
     );
     ExitCode::SUCCESS
@@ -192,34 +200,64 @@ fn open_writer(path: &Path) -> std::io::Result<Box<dyn Write>> {
     }
 }
 
+/// Print the skipped-record warning. Skipping is the default, so the count
+/// must always reach the user.
+fn warn_skipped(summary: &WriteSummary) {
+    if summary.skipped() == 0 {
+        return;
+    }
+    eprintln!(
+        "warning: skipped {} unreadable record(s) ({} spectra, {} chromatograms); \
+         rerun with --strict to stop at the first one and see its error",
+        summary.skipped(),
+        summary.spectra_skipped,
+        summary.chromatograms_skipped
+    );
+}
+
 fn report(
     profile: Option<ProfileFormat>,
     output: &Path,
     indexed: bool,
-    spectra: usize,
-    validated: bool,
+    summary: &WriteSummary,
     elapsed_sec: f64,
 ) {
     match profile {
         None => {
             let tag = if indexed { " (indexed)" } else { "" };
-            eprintln!("wrote {} in {:.1}s{tag}", output.display(), elapsed_sec);
+            eprintln!(
+                "wrote {} ({} spectra, {} chromatograms) in {:.1}s{tag}",
+                output.display(),
+                summary.spectra_written,
+                summary.chromatograms_written,
+                elapsed_sec
+            );
         }
         Some(ProfileFormat::Text) => {
             eprintln!(
-                "output={} indexed={} validated={} spectra={} elapsed_sec={:.3}",
+                "output={} indexed={} spectra={} spectra_skipped={} chromatograms={} \
+                 chromatograms_skipped={} elapsed_sec={:.3}",
                 output.display(),
                 indexed,
-                validated,
-                spectra,
+                summary.spectra_written,
+                summary.spectra_skipped,
+                summary.chromatograms_written,
+                summary.chromatograms_skipped,
                 elapsed_sec
             );
         }
         Some(ProfileFormat::Json) => {
             let out_str = output.display().to_string();
             eprintln!(
-                "{{\"output\":{:?},\"indexed\":{},\"validated\":{},\"spectra\":{},\"elapsed_sec\":{:.3}}}",
-                out_str, indexed, validated, spectra, elapsed_sec
+                "{{\"output\":{:?},\"indexed\":{},\"spectra\":{},\"spectra_skipped\":{},\
+                 \"chromatograms\":{},\"chromatograms_skipped\":{},\"elapsed_sec\":{:.3}}}",
+                out_str,
+                indexed,
+                summary.spectra_written,
+                summary.spectra_skipped,
+                summary.chromatograms_written,
+                summary.chromatograms_skipped,
+                elapsed_sec
             );
         }
     }
@@ -239,9 +277,9 @@ fn run_info(args: InfoArgs) -> ExitCode {
     };
     let t_start = Instant::now();
     let collect_result = if args.centroid {
-        collect_centroided(detected.clone(), args.centroid_min_intensity)
+        collect_centroided(&detected, args.centroid_min_intensity)
     } else {
-        collect(detected.clone())
+        collect(&detected)
     };
     let (records, metadata) = match collect_result {
         Ok(p) => p,
@@ -269,7 +307,7 @@ struct Summary {
     vendor: &'static str,
     path: PathBuf,
     instrument: String,
-    instrument_accession: &'static str,
+    instrument_accession: String,
     source_format: String,
     native_id_format: String,
     software: String,
@@ -364,6 +402,7 @@ fn summarize(
         let key = match r.polarity {
             Some(openmassspec_core::Polarity::Positive) => "pos",
             Some(openmassspec_core::Polarity::Negative) => "neg",
+            Some(other) => other.as_str(),
             None => "unk",
         };
         *polarity_counts.entry(key.to_string()).or_insert(0) += 1;
@@ -381,8 +420,8 @@ fn summarize(
     Summary {
         vendor: detected.format.name(),
         path: detected.path.clone(),
-        instrument: meta.instrument.name.clone(),
-        instrument_accession: meta.instrument.accession,
+        instrument: meta.instrument.name.to_string(),
+        instrument_accession: meta.instrument.accession.to_string(),
         source_format: format!(
             "{} ({})",
             meta.source_file_format.name, meta.source_file_format.accession
@@ -412,7 +451,7 @@ fn run_validate(args: ValidateArgs) -> ExitCode {
     let records_res: Result<(Vec<SpectrumRecord>, &'static str), String> =
         if let Some(detected) = detect_format(&args.input) {
             let vendor = detected.format.name();
-            match collect(detected) {
+            match collect(&detected) {
                 Ok((records, _meta)) => Ok((records, vendor)),
                 Err(e) => Err(format!("collect: {e}")),
             }
@@ -483,6 +522,8 @@ fn conformance_variant(e: &openmassspec_core::conformance::ConformanceError) -> 
         C::RetentionTimeNonMonotonic { .. } => "RetentionTimeNonMonotonic",
         C::IndexSequence { .. } => "IndexSequence",
         C::EmptySpectrum { .. } => "EmptySpectrum",
+        C::Source { .. } => "Source",
+        _ => "Other",
     }
 }
 

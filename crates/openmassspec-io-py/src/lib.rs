@@ -3,7 +3,7 @@
 //! Exposes a small, vendor-neutral surface:
 //!
 //! * `detect(path) -> str | None`
-//! * `to_mzml(input, output, *, indexed=True, centroid=False, centroid_min_intensity=None) -> None`
+//! * `to_mzml(input, output, *, indexed=True, centroid=False, centroid_min_intensity=None, skip_unreadable=True) -> dict`
 //! * `iter_spectra(path, *, centroid=False, centroid_min_intensity=None) -> Iterator[Spectrum]`
 //! * `read_arrow(path, batch_size=1024, *, centroid=False, centroid_min_intensity=None) -> pyarrow.RecordBatchReader`
 //!   (built when the `arrow` feature is enabled, which is the default).
@@ -13,6 +13,12 @@
 //! spectra pass through unchanged. `centroid_min_intensity` discards
 //! picked peaks below that noise floor and is ignored unless `centroid`
 //! is set.
+//!
+//! A spectrum or chromatogram the reader cannot decode raises
+//! `RuntimeError` from `iter_spectra`, `read_arrow`, and
+//! `read_chromatograms`. `to_mzml` leaves such records out by default
+//! (`skip_unreadable=True`), returns their count, and issues a
+//! `RuntimeWarning`; `skip_unreadable=False` raises at the first one.
 //!
 //! All m/z, intensity, and inverse-mobility arrays handed to Python are
 //! created via `numpy::PyArray1::from_vec_bound`, which transfers
@@ -27,9 +33,9 @@ use std::path::{Path, PathBuf};
 use numpy::PyArray1;
 use openmassspec_core::{
     Activation, Analyzer, ChromatogramRecord, CvTerm, MobilityArrayKind, Polarity, PrecursorInfo,
-    SpectrumRecord,
+    RecordErrorPolicy, SpectrumRecord,
 };
-use openmassspec_io::{detect_format, Detected};
+use openmassspec_io::{detect_format, ConvertOptions, Detected};
 use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -58,10 +64,7 @@ fn map_err<E: std::fmt::Display>(e: E) -> PyErr {
 }
 
 fn polarity_str(p: Polarity) -> &'static str {
-    match p {
-        Polarity::Positive => "positive",
-        Polarity::Negative => "negative",
-    }
+    p.as_str()
 }
 
 fn activation_str(a: Activation) -> &'static str {
@@ -77,6 +80,7 @@ fn activation_str(a: Activation) -> &'static str {
         Activation::UVPD => "uvpd",
         Activation::SID => "sid",
         Activation::EThcD => "ethcd",
+        other => other.as_str(),
     }
 }
 
@@ -88,20 +92,18 @@ fn analyzer_str(a: Analyzer) -> &'static str {
         Analyzer::TOFMS => "tofms",
         Analyzer::FTMS => "ftms",
         Analyzer::Sector => "sector",
+        other => other.as_str(),
     }
 }
 
 fn mobility_kind_str(k: MobilityArrayKind) -> &'static str {
-    match k {
-        MobilityArrayKind::InverseReducedVsPerCm2 => "inverse_reduced_k0",
-        MobilityArrayKind::DriftTimeMilliseconds => "drift_time_ms",
-    }
+    k.as_str()
 }
 
 fn cv_term_to_dict<'py>(py: Python<'py>, term: &CvTerm) -> PyResult<Bound<'py, PyDict>> {
     let d = PyDict::new(py);
-    d.set_item("accession", term.accession)?;
-    d.set_item("name", &term.name)?;
+    d.set_item("accession", term.accession.as_ref())?;
+    d.set_item("name", term.name.as_ref())?;
     Ok(d)
 }
 
@@ -171,12 +173,8 @@ impl Spectrum {
     }
     #[getter]
     fn scan_mode(&self) -> PyResult<Option<&'static str>> {
-        self.rec_ref().map(|r| {
-            r.scan_mode.map(|m| match m {
-                openmassspec_core::ScanMode::Centroid => "centroid",
-                openmassspec_core::ScanMode::Profile => "profile",
-            })
-        })
+        self.rec_ref()
+            .map(|r| r.scan_mode.map(openmassspec_core::ScanMode::as_str))
     }
     #[getter]
     fn analyzer(&self) -> PyResult<Option<&'static str>> {
@@ -313,7 +311,7 @@ impl RunInfo {
     /// PSI-MS CV accession for the instrument (e.g. "MS:1001910").
     #[getter]
     fn instrument_accession(&self) -> &str {
-        self.meta.instrument.accession
+        &self.meta.instrument.accession
     }
     /// Source file name (basename of the vendor acquisition path).
     #[getter]
@@ -469,11 +467,11 @@ impl SpectrumIter {
                 }
             };
             let result = if centroid {
-                openmassspec_io::stream_centroided(detected, min_intensity, |rec| {
+                openmassspec_io::stream_centroided(&detected, min_intensity, |rec| {
                     send_rec(&tx, rec)
                 })
             } else {
-                openmassspec_io::stream(detected, |rec| send_rec(&tx, rec))
+                openmassspec_io::stream(&detected, |rec| send_rec(&tx, rec))
             };
             let outcome = match result {
                 Ok(_meta) => Ok(()),
@@ -536,27 +534,62 @@ fn detect(path: PathBuf) -> Option<&'static str> {
 /// already-centroid spectra pass through unchanged). `centroid_min_intensity`
 /// discards picked peaks below that noise floor and is ignored unless
 /// `centroid` is set.
+///
+/// With `skip_unreadable=True` (the default) a spectrum or chromatogram the
+/// reader cannot decode is left out of the output and a `RuntimeWarning`
+/// reports how many were skipped. With `skip_unreadable=False` the first
+/// one raises `RuntimeError`.
+///
+/// Returns a dict with `spectra_written`, `spectra_skipped`,
+/// `chromatograms_written`, and `chromatograms_skipped`.
 #[pyfunction]
-#[pyo3(signature = (input, output, *, indexed = true, centroid = false, centroid_min_intensity = None))]
-fn to_mzml(
+#[pyo3(signature = (input, output, *, indexed = true, centroid = false, centroid_min_intensity = None, skip_unreadable = true))]
+fn to_mzml<'py>(
+    py: Python<'py>,
     input: PathBuf,
     output: PathBuf,
     indexed: bool,
     centroid: bool,
     centroid_min_intensity: Option<f32>,
-) -> PyResult<()> {
+    skip_unreadable: bool,
+) -> PyResult<Bound<'py, PyDict>> {
     let detected = detected_or_err(&input)?;
-    if centroid {
-        openmassspec_io::convert_to_mzml_centroided(
-            detected,
-            &output,
-            indexed,
-            centroid_min_intensity,
-        )
-        .map_err(map_err)
+    let policy = if skip_unreadable {
+        RecordErrorPolicy::Skip
     } else {
-        openmassspec_io::convert_to_mzml(detected, &output, indexed).map_err(map_err)
+        RecordErrorPolicy::Fail
+    };
+    let opts = ConvertOptions::new()
+        .with_indexed(indexed)
+        .with_centroid(centroid)
+        .with_centroid_min_intensity(centroid_min_intensity)
+        .with_record_error_policy(policy);
+    let summary = py
+        .detach(|| openmassspec_io::convert_to_mzml(&detected, &output, &opts))
+        .map_err(map_err)?;
+    if summary.skipped() > 0 {
+        let msg = format!(
+            "skipped {} unreadable record(s) ({} spectra, {} chromatograms) while writing {}; \
+             pass skip_unreadable=False to raise at the first one",
+            summary.skipped(),
+            summary.spectra_skipped,
+            summary.chromatograms_skipped,
+            output.display()
+        );
+        let msg = std::ffi::CString::new(msg).map_err(map_err)?;
+        PyErr::warn(
+            py,
+            &py.get_type::<pyo3::exceptions::PyRuntimeWarning>(),
+            &msg,
+            1,
+        )?;
     }
+    let d = PyDict::new(py);
+    d.set_item("spectra_written", summary.spectra_written)?;
+    d.set_item("spectra_skipped", summary.spectra_skipped)?;
+    d.set_item("chromatograms_written", summary.chromatograms_written)?;
+    d.set_item("chromatograms_skipped", summary.chromatograms_skipped)?;
+    Ok(d)
 }
 
 /// Return run-level metadata for a vendor acquisition without iterating spectra.
@@ -576,7 +609,7 @@ fn run_info(
     let _ = (centroid, centroid_min_intensity);
     let detected = detected_or_err(&path)?;
     let meta = py
-        .detach(|| openmassspec_io::metadata_only(detected))
+        .detach(|| openmassspec_io::metadata_only(&detected))
         .map_err(map_err)?;
     Ok(RunInfo { meta })
 }
@@ -586,7 +619,7 @@ fn run_info(
 fn read_chromatograms(py: Python<'_>, path: PathBuf) -> PyResult<Vec<Chromatogram>> {
     let detected = detected_or_err(&path)?;
     let records = py
-        .detach(|| openmassspec_io::collect_chromatograms(detected))
+        .detach(|| openmassspec_io::collect_chromatograms(&detected))
         .map_err(map_err)?;
     Ok(records
         .into_iter()
@@ -631,7 +664,7 @@ mod arrow_bridge {
     use super::*;
     use arrow::pyarrow::ToPyArrow;
     use arrow::record_batch::RecordBatch;
-    use openmassspec_core::arrow::SpectrumBatchBuilder;
+    use openmassspec_io::arrow::SpectrumBatchBuilder;
     use std::sync::{
         mpsc::{sync_channel, Receiver, SyncSender},
         Mutex,
@@ -701,10 +734,10 @@ mod arrow_bridge {
         // needs) is available as soon as the source is opened, so it does
         // not require decoding any spectra.
         let meta = py
-            .detach(|| openmassspec_io::metadata_only(detected.clone()))
+            .detach(|| openmassspec_io::metadata_only(&detected))
             .map_err(map_err)?;
         let mobility_kind = meta.mobility_array_kind;
-        let schema = openmassspec_core::arrow::spectrum_record_schema();
+        let schema = openmassspec_io::arrow::spectrum_record_schema();
         let pa = py.import("pyarrow")?;
         let py_schema = schema.to_pyarrow(py)?;
         let (sender, receiver) = sync_channel(2);
@@ -775,9 +808,9 @@ mod arrow_bridge {
         };
 
         let stream_result = if centroid {
-            openmassspec_io::stream_centroided(detected, min_intensity, on_spectrum)
+            openmassspec_io::stream_centroided(&detected, min_intensity, on_spectrum)
         } else {
-            openmassspec_io::stream(detected, on_spectrum)
+            openmassspec_io::stream(&detected, on_spectrum)
         };
 
         if let Some(e) = arrow_err {
