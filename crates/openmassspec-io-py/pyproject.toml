@@ -30,8 +30,8 @@ dependencies = ["numpy>=1.23"]
 
 [project.optional-dependencies]
 arrow = ["pyarrow>=14"]
-polars = ["pyarrow>=14", "polars>=1"]
-test = ["pytest>=7", "numpy>=1.23", "pyarrow>=14", "polars>=1"]
+polars = ["pyarrow>=14", "polars>=2.0.0"]
+test = ["pytest>=7", "numpy>=1.23", "pyarrow>=14", "polars>=2.0.0"]
 
 [project.urls]
 Repository = "https://github.com/Sigilweaver/OpenMassSpec"
