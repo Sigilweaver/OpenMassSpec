@@ -278,23 +278,22 @@ jobs:
           OPENMASSSPEC_REQUIRE_PARITY: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' && '1' || '0' }}
         run: pytest crates/openmassspec-io-py/tests -v
 
+  docs-validation:
+    name: Shared docs validation
+    permissions:
+      contents: read
+    uses: Sigilweaver/ops/.github/workflows/docs.yml@757c6789b96e3ac05bbc7d1a092d01cbeb0cb9e2
+    with:
+      tooling-ref: 757c6789b96e3ac05bbc7d1a092d01cbeb0cb9e2
   docs:
     name: Docs (Docusaurus)
+    needs: docs-validation
+    if: ${{ always() }}
     runs-on: ubuntu-latest
+    env:
+      DOCS_RESULT: ${{ needs.docs-validation.result }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install
-        working-directory: docs
-        run: bun install --frozen-lockfile
-      - name: Build
-        working-directory: docs
-        run: bun run build:cloudflare
-      # Cloudflare deployment is handled by the Cloudflare GitHub App
-      # via push events. No wrangler deploy step is needed here.
-
+      - run: test "$DOCS_RESULT" = success
   # Public API compatibility of the crates.io-published crate against its
   # latest published version. A breaking change without a matching version
   # bump fails; a deliberate major bump passes. OS-independent, so Linux only.
