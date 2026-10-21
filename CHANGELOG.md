@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Retry CI fixture downloads with exponential backoff and Retry-After support,
+  and report the failing URL when retries are exhausted.
+
 ## [2.0.0] - 2026-10-11
 
 ### Breaking (Rust)

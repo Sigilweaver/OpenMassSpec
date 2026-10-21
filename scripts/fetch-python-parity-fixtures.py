@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import shutil
-import urllib.request
 import zipfile
 from pathlib import Path
+
+from download_fixture import download_file
 
 
 ROOT = Path(__file__).resolve().parents[1] / "corpus"
@@ -33,12 +33,7 @@ def fetch(relative: str, url: str) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.is_file() and destination.stat().st_size > 0:
         return destination
-    request = urllib.request.Request(url, headers={"User-Agent": "OpenMassSpec-CI/1.0"})
-    partial = destination.with_name(destination.name + ".part")
-    with urllib.request.urlopen(request, timeout=180) as response, partial.open("wb") as output:
-        shutil.copyfileobj(response, output)
-    partial.replace(destination)
-    return destination
+    return download_file(url, destination)
 
 
 def extract(archive: Path, destination: Path) -> None:

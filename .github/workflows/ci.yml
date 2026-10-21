@@ -83,38 +83,40 @@ jobs:
             corpus/agilent corpus/sciex/PXD022088
 
           # Thermo (PXD068962, PRIDE, CC0)
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
-            -o corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw \
-            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD068962/insource-CID.raw"
+          python3 scripts/download_fixture.py \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD068962/insource-CID.raw" \
+            corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw
 
           # Waters (PXD058812, PRIDE, CC0) - zipped bundle directory
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" -o waters.raw.zip \
-            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/05/PXD058812/molecular_mass_P15_01.raw.zip"
+          python3 scripts/download_fixture.py \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/05/PXD058812/molecular_mass_P15_01.raw.zip" \
+            waters.raw.zip
           unzip -q -d corpus/waters waters.raw.zip
           rm waters.raw.zip
           test -f corpus/waters/molecular_mass_P15_01.raw/_HEADER.TXT
 
           # Bruker (PXD036417, PRIDE, CC0) - zipped bundle directory, ~90 MB
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" -o bruker.d.zip \
-            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/11/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d.zip"
+          python3 scripts/download_fixture.py \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/11/PXD036417/NQO1-F107C_coi-N2-P_200-0C_3996.d.zip" \
+            bruker.d.zip
           unzip -q -d corpus/bruker bruker.d.zip
           rm bruker.d.zip
           test -f corpus/bruker/NQO1-F107C_coi-N2-P_200-0C_3996.d/analysis.tdf
           test -f corpus/bruker/NQO1-F107C_coi-N2-P_200-0C_3996.d/analysis.tdf_bin
 
           # Shimadzu QGD (PXD034978, PRIDE, CC0)
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
-            -o corpus/shimadzu/PXD034978/49_27a__8122021_11.qgd \
-            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/08/PXD034978/49_27a__8122021_11.qgd"
+          python3 scripts/download_fixture.py \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/08/PXD034978/49_27a__8122021_11.qgd" \
+            corpus/shimadzu/PXD034978/49_27a__8122021_11.qgd
 
           # Shimadzu LCD, IT-TOF variant (MTBLS432, MetaboLights/EBI)
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
-            -o "corpus/shimadzu/MTBLS432/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd" \
-            "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS432/FILES/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd"
+          python3 scripts/download_fixture.py \
+            "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS432/FILES/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd" \
+            "corpus/shimadzu/MTBLS432/6-wk_HZ_CC_male_12_65__30min_pos-neg_43.lcd"
 
           # Shimadzu LCD, QTOF variant (MSV000084197, MassIVE, CC0) - via
           # the HTTPS download endpoint; the FTP endpoint requires FTPS
-          # and isn't reliably reachable with plain curl in CI. MassIVE can
+          # and isn't reliably reachable in CI. MassIVE can
           # intermittently return an HTTP-success error document, so retry
           # until the downloaded file has the Compound File Binary signature
           # that every LCD file must begin with.
@@ -122,8 +124,7 @@ jobs:
           lcd_url="https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000084197%2Fraw%2F20190607_NM16.lcd"
           for attempt in 1 2 3; do
             rm -f "$lcd_dest.part"
-            curl --fail --retry 3 --retry-all-errors --retry-delay 2 -sSL \
-              --user-agent "OpenMassSpec-CI/1.0" -o "$lcd_dest.part" "$lcd_url"
+            python3 scripts/download_fixture.py "$lcd_url" "$lcd_dest.part"
             if python3 - "$lcd_dest.part" <<'PY'
           import pathlib
           import sys
@@ -137,7 +138,7 @@ jobs:
             fi
             rm -f "$lcd_dest.part"
             if [ "$attempt" = 3 ]; then
-              echo "MassIVE did not return a valid Compound File Binary LCD" >&2
+              echo "MassIVE did not return a valid Compound File Binary LCD: $lcd_url" >&2
               exit 1
             fi
             sleep "$attempt"
@@ -146,8 +147,9 @@ jobs:
           # Agilent QTOF (PXD030293, PRIDE, CC0) - zipped bundle directory,
           # ~960 KB zipped; same fixture wired into OpenARaw's own CI, see
           # Sigilweaver/OpenARaw#28.
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" -o agilent.d.zip \
-            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/07/PXD030293/180814-Sample19.d.zip"
+          python3 scripts/download_fixture.py \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2022/07/PXD030293/180814-Sample19.d.zip" \
+            agilent.d.zip
           unzip -q -d corpus/agilent agilent.d.zip
           rm agilent.d.zip
           test -d corpus/agilent/180814-Sample19.d
@@ -155,12 +157,12 @@ jobs:
           # SCIEX (PXD022088, PRIDE, CC0) - .wiff + .wiff.scan pair, ~2.5 MB
           # total; same fixture wired into OpenSXRaw's own CI, see
           # Sigilweaver/OpenSXRaw#33.
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
-            -o corpus/sciex/PXD022088/Rcor2KOESC1.wiff \
-            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff"
-          curl -sSL --user-agent "OpenMassSpec-CI/1.0" \
-            -o corpus/sciex/PXD022088/Rcor2KOESC1.wiff.scan \
-            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff.scan"
+          python3 scripts/download_fixture.py \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff" \
+            corpus/sciex/PXD022088/Rcor2KOESC1.wiff
+          python3 scripts/download_fixture.py \
+            "https://ftp.pride.ebi.ac.uk/pride/data/archive/2020/12/PXD022088/Rcor2KOESC1.wiff.scan" \
+            corpus/sciex/PXD022088/Rcor2KOESC1.wiff.scan
 
           du -sh corpus
 
