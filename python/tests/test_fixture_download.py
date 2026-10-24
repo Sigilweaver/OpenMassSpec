@@ -105,7 +105,7 @@ def test_permanent_http_error_fails_immediately(transfer):
     assert not destination.exists()
 
 
-@pytest.mark.parametrize("error", [http_error(503), URLError("connection reset"), TimeoutError()])
+@pytest.mark.parametrize("error", [http_error(403), http_error(503), URLError("connection reset"), TimeoutError()])
 def test_other_transient_failures(transfer, error):
     opener, sleep, destination = transfer
     opener.side_effect = [error, BytesIO(b"fixture")]

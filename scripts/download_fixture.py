@@ -17,7 +17,8 @@ from pathlib import Path
 MAX_ATTEMPTS = 5
 BACKOFF_SECONDS = 2
 MAX_RETRY_AFTER_SECONDS = 60
-RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
+# PRIDE answers some throttled requests with 403 rather than 429.
+RETRYABLE_STATUS = {403, 408, 429, 500, 502, 503, 504}
 
 
 def retry_after_seconds(value: str | None) -> float:
