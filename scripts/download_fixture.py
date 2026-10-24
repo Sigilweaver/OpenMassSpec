@@ -16,6 +16,7 @@ from pathlib import Path
 
 MAX_ATTEMPTS = 5
 BACKOFF_SECONDS = 2
+MAX_RETRY_AFTER_SECONDS = 60
 RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 
 
@@ -33,6 +34,15 @@ def retry_after_seconds(value: str | None) -> float:
         return 0
 
 
+def content_length(response) -> int | None:
+    """Return the declared body length, or None when the server sent none."""
+    headers = getattr(response, "headers", None)
+    value = headers.get("Content-Length") if headers is not None else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value)
+    return None
+
+
 def download_file(url: str, destination: Path) -> Path:
     """Retry a whole transfer; rename the temporary file only after success."""
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -42,13 +52,16 @@ def download_file(url: str, destination: Path) -> Path:
         try:
             with urllib.request.urlopen(request, timeout=180) as response, partial.open("wb") as output:
                 shutil.copyfileobj(response, output)
+                expected = content_length(response)
+                if expected is not None and output.tell() != expected:
+                    raise IncompleteRead(b"", expected - output.tell())
         except (urllib.error.URLError, TimeoutError, ConnectionError, IncompleteRead) as error:
             delay = BACKOFF_SECONDS * 2 ** (attempt - 1)
             retryable = True
             if isinstance(error, urllib.error.HTTPError):
                 retryable = error.code in RETRYABLE_STATUS
                 retry_after = error.headers.get("Retry-After") if error.headers else None
-                delay = max(delay, retry_after_seconds(retry_after))
+                delay = max(delay, min(retry_after_seconds(retry_after), MAX_RETRY_AFTER_SECONDS))
                 error.close()
             if not retryable or attempt == MAX_ATTEMPTS:
                 raise RuntimeError(

@@ -37,7 +37,9 @@ def transfer(monkeypatch, tmp_path):
     return opener, sleep, tmp_path / "vendor/fixture.raw"
 
 
-@pytest.mark.parametrize("retry_after, delay", [(None, 2), ("7", 7), ("0", 2), ("bad", 2)])
+@pytest.mark.parametrize(
+    "retry_after, delay", [(None, 2), ("7", 7), ("0", 2), ("bad", 2), ("86400", 60)]
+)
 def test_429_then_success(transfer, retry_after, delay):
     opener, sleep, destination = transfer
     error = http_error(retry_after=retry_after)
@@ -144,3 +146,21 @@ def test_failed_transfer_preserves_existing_fixture(transfer):
 
     assert destination.read_bytes() == b"previous fixture"
     assert not destination.with_name("fixture.raw.part").exists()
+
+
+def test_truncated_body_restarts_transfer(transfer):
+    opener, sleep, destination = transfer
+    headers = Message()
+    headers["Content-Length"] = "1000"
+    response = Mock()
+    response.__enter__ = Mock(return_value=response)
+    response.__exit__ = Mock(return_value=False)
+    response.headers = headers
+    response.read.side_effect = [b"x" * 100, b""]
+    opener.side_effect = [response, BytesIO(b"good")]
+
+    downloader.download_file(URL, destination)
+
+    assert destination.read_bytes() == b"good"
+    assert not destination.with_name("fixture.raw.part").exists()
+    sleep.assert_called_once_with(2)
