@@ -38,8 +38,7 @@ fn make_record(index: usize, scan: u32, ms_level: u32, rt_sec: f64) -> SpectrumR
             .with_isolation_width(2.0)
             .with_charge(2)
             .with_intensity(1.0e5)
-            .with_collision_energy(28.0)
-            .with_ce_is_nce(true)
+            .with_collision_energy(28.0, openmassspec_core::CollisionEnergyUnit::Nce)
             .with_precursor_native_id(format!(
                 "controllerType=0 controllerNumber=1 scan={}",
                 scan - 1

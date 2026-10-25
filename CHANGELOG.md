@@ -8,15 +8,18 @@ All notable changes to this project will be documented in this file.
 
 - Python: `Spectrum.analyzer`, `precursor["analyzer"]` and
   `RunInfo.analyzers` use the stack-wide labels (`"tof"`, not `"tofms"`).
-  `precursor["ce_is_nce"]` is `None` when the unit is unknown, and
-  `precursor["collision_energy_unit"]` (`"ev"`, `"nce"` or `None`) is new.
-  `to_mzml` returns `warning_counts`, `issues`, `issues_truncated`,
-  `spectra_invalid`, `chromatograms_invalid` and `spectrum_count_mismatch`
-  in its dict.
-- Rust: `openmassspec_io::arrow` follows `openmassspec-arrow`
-  (`SpectrumBatchBuilder::push` returns a `Result`).
-- Requires the `openmassspec-core` release that adds `Leniency`, `Warning`
-  and `WriteSummary::issues`.
+  `Spectrum.retention_time_sec` can be `None`. In `precursor`, `ce_is_nce`
+  is removed; `collision_energy` and `collision_energy_unit` (`"ev"`,
+  `"nce"` or `None`) describe the first energy and `collision_energies` lists
+  all of them. `to_mzml` returns `warning_counts`, `issues`,
+  `issues_truncated`, `spectra_invalid`, `chromatograms_invalid` and
+  `spectrum_count_mismatch` in its dict, and `read_arrow` batches follow the
+  Arrow schema of `openmassspec-arrow` 4 (new columns, `precursor_ce_is_nce`
+  replaced by `precursor_collision_energy_unit`).
+- Rust: depends on `openmassspec-core` 4 and `openmassspec-arrow` 4;
+  `openmassspec_io::arrow` follows them (`SpectrumBatchBuilder::push` returns
+  a `BatchError`). The reader crates must be released against Core 4 first.
+- The crate and Python packages are version 3.0.0.
 
 ### Behavior changes
 

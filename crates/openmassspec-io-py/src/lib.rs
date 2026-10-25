@@ -159,7 +159,7 @@ impl Spectrum {
         self.rec_ref().map(|r| r.ms_level)
     }
     #[getter]
-    fn retention_time_sec(&self) -> PyResult<f64> {
+    fn retention_time_sec(&self) -> PyResult<Option<f64>> {
         self.rec_ref().map(|r| r.retention_time_sec)
     }
     #[getter]
@@ -298,8 +298,13 @@ impl Spectrum {
     fn __repr__(&self) -> PyResult<String> {
         let r = self.rec_ref()?;
         Ok(format!(
-            "<Spectrum index={} ms_level={} native_id={:?} rt_sec={:.3} n_peaks={}>",
-            r.index, r.ms_level, r.native_id, r.retention_time_sec, self.derived.n_peaks
+            "<Spectrum index={} ms_level={} native_id={:?} rt_sec={} n_peaks={}>",
+            r.index,
+            r.ms_level,
+            r.native_id,
+            r.retention_time_sec
+                .map_or_else(|| "None".to_string(), |rt| format!("{rt:.3}")),
+            self.derived.n_peaks
         ))
     }
 }
@@ -317,17 +322,27 @@ fn precursor_to_dict<'py>(py: Python<'py>, p: &PrecursorInfo) -> PyResult<Bound<
     d.set_item("isolation_width", p.isolation_width)?;
     d.set_item("charge", p.charge)?;
     d.set_item("intensity", p.intensity)?;
-    d.set_item("collision_energy", p.collision_energy)?;
+    // The first collision energy, for the common single-energy case, and
+    // all of them with their units.
+    let first = p.collision_energies.first();
+    d.set_item("collision_energy", first.map(|ce| ce.value))?;
     d.set_item(
         "collision_energy_unit",
-        p.collision_energy_unit
+        first
+            .and_then(|ce| ce.unit)
             .map(openmassspec_core::CollisionEnergyUnit::as_str),
     )?;
-    d.set_item(
-        "ce_is_nce",
-        p.collision_energy_unit
-            .map(|u| u == openmassspec_core::CollisionEnergyUnit::Nce),
-    )?;
+    let energies = pyo3::types::PyList::empty(py);
+    for ce in &p.collision_energies {
+        let item = PyDict::new(py);
+        item.set_item("value", ce.value)?;
+        item.set_item(
+            "unit",
+            ce.unit.map(openmassspec_core::CollisionEnergyUnit::as_str),
+        )?;
+        energies.append(item)?;
+    }
+    d.set_item("collision_energies", energies)?;
     d.set_item("precursor_native_id", p.precursor_native_id.clone())?;
     d.set_item("activation", p.activation.map(activation_str))?;
     d.set_item("analyzer", p.analyzer.map(analyzer_str))?;
@@ -663,10 +678,12 @@ fn to_mzml<'py>(
             output.display()
         ));
     }
-    if let Some((hint, accounted)) = summary.spectrum_count_mismatch {
+    if let Some(m) = &summary.spectrum_count_mismatch {
         warnings.push(format!(
-            "the reader announced {hint} spectra but {accounted} were written or skipped \
-             for {}; spectra may be missing",
+            "the reader announced {} spectra but {} were written or skipped for {}; \
+             spectra may be missing",
+            m.announced,
+            m.accounted,
             output.display()
         ));
     }
@@ -702,7 +719,12 @@ fn to_mzml<'py>(
     }
     d.set_item("issues", issues)?;
     d.set_item("issues_truncated", summary.issues_truncated)?;
-    d.set_item("spectrum_count_mismatch", summary.spectrum_count_mismatch)?;
+    d.set_item(
+        "spectrum_count_mismatch",
+        summary
+            .spectrum_count_mismatch
+            .map(|m| (m.announced, m.accounted)),
+    )?;
     Ok(d)
 }
 
@@ -904,7 +926,7 @@ mod arrow_bridge {
         // Arrow batch-finish failure isn't one of that enum's variants, so
         // it's stashed here and `Cancelled` is used to stop iteration, then
         // surfaced below once streaming has returned.
-        let mut arrow_err: Option<::arrow::error::ArrowError> = None;
+        let mut arrow_err: Option<openmassspec_io::arrow::BatchError> = None;
 
         let on_spectrum = |rec: SpectrumRecord| -> openmassspec_io::Result<()> {
             if let Err(e) = builder.push(&rec) {
@@ -913,12 +935,10 @@ mod arrow_bridge {
             }
             n += 1;
             if n == batch_size {
-                // `finish` consumes `self`, so swap in a fresh builder
-                // rather than moving `builder` out of this `FnMut`'s
-                // captured environment.
-                let finished =
-                    std::mem::replace(&mut builder, SpectrumBatchBuilder::new(mobility_kind));
-                match finished.finish() {
+                // `finish_batch` keeps the builder, and with it the native
+                // ids seen so far, so a duplicate id in a later batch is
+                // still caught.
+                match builder.finish_batch() {
                     Ok(b) => {
                         sender
                             .send(ArrowMsg::Batch(b))

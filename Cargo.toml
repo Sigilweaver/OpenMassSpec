@@ -17,8 +17,8 @@ homepage = "https://sigilweaver.app/openmassspec/"
 documentation = "https://sigilweaver.app/openmassspec/docs/"
 
 [workspace.dependencies]
-openmassspec-core = "3.0.0"
-openmassspec-arrow = "3.0.0"
+openmassspec-core = "4.0.0"
+openmassspec-arrow = "4.0.0"
 opentfraw = "3.0.0"
 opentimstdf = "3.0.0"
 openwraw = "4.0.0"

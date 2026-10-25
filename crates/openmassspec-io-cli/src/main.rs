@@ -239,7 +239,7 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
 const EXIT_INCOMPLETE: u8 = 4;
 
 fn leniency(allow: &[Check]) -> Leniency {
-    allow.iter().copied().collect()
+    allow.iter().cloned().collect()
 }
 
 /// Directory for the writer's spool file: the directory of `output`, or
@@ -330,11 +330,12 @@ fn warn_summary(summary: &WriteSummary) -> bool {
             );
         }
     }
-    if let Some((hint, accounted)) = summary.spectrum_count_mismatch {
+    if let Some(m) = &summary.spectrum_count_mismatch {
         incomplete = true;
         eprintln!(
-            "warning: the reader announced {hint} spectra but {accounted} were written or \
-             skipped; spectra may be missing"
+            "warning: the reader announced {} spectra but {} were written or skipped; \
+             spectra may be missing",
+            m.announced, m.accounted
         );
     }
     for (code, n) in &summary.warning_counts {
@@ -541,11 +542,9 @@ fn summarize(
             None => "unk",
         };
         *polarity_counts.entry(key.to_string()).or_insert(0) += 1;
-        if r.retention_time_sec < rt_min {
-            rt_min = r.retention_time_sec;
-        }
-        if r.retention_time_sec > rt_max {
-            rt_max = r.retention_time_sec;
+        if let Some(rt) = r.retention_time_sec {
+            rt_min = rt_min.min(rt);
+            rt_max = rt_max.max(rt);
         }
     }
     if !rt_min.is_finite() {
