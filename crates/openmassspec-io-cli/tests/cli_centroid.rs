@@ -215,7 +215,7 @@ fn sciex_without_scan_mode_fails_unless_allowed() {
         "must not assert a representation"
     );
     assert_eq!(
-        text.matches("openmassspec: spectrum representation")
+        text.matches("openmassspec: warning unknown_scan_mode")
             .count(),
         spectra
     );
