@@ -806,7 +806,7 @@ mod arrow_bridge {
     use super::*;
     use arrow::pyarrow::ToPyArrow;
     use arrow::record_batch::RecordBatch;
-    use openmassspec_io::arrow::SpectrumBatchBuilder;
+    use openmassspec_io::arrow::arrow_60::SpectrumBatchBuilder;
     use std::sync::{
         mpsc::{sync_channel, Receiver, SyncSender},
         Mutex,
@@ -881,7 +881,7 @@ mod arrow_bridge {
             .detach(|| openmassspec_io::metadata_only(&detected))
             .map_err(map_err)?;
         let mobility_kind = meta.mobility_array_kind;
-        let schema = openmassspec_io::arrow::spectrum_record_schema();
+        let schema = openmassspec_io::arrow::arrow_60::spectrum_record_schema();
         let pa = py.import("pyarrow")?;
         let py_schema = schema.to_pyarrow(py)?;
         let (sender, receiver) = sync_channel(2);
@@ -926,7 +926,7 @@ mod arrow_bridge {
         // Arrow batch-finish failure isn't one of that enum's variants, so
         // it's stashed here and `Cancelled` is used to stop iteration, then
         // surfaced below once streaming has returned.
-        let mut arrow_err: Option<openmassspec_io::arrow::BatchError> = None;
+        let mut arrow_err: Option<openmassspec_io::arrow::arrow_60::BatchError> = None;
 
         let on_spectrum = |rec: SpectrumRecord| -> openmassspec_io::Result<()> {
             if let Err(e) = builder.push(&rec) {

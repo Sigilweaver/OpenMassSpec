@@ -1177,7 +1177,7 @@ dependencies = [
 [[package]]
 name = "openmassspec-arrow"
 version = "4.0.0"
-source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#5967d902ce72016772ee1a5513c582b75b96df7e"
+source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#dad6241e20505d9640a1b73ae4c8e8289f78930f"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -1188,7 +1188,7 @@ dependencies = [
 [[package]]
 name = "openmassspec-core"
 version = "4.0.0"
-source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#5967d902ce72016772ee1a5513c582b75b96df7e"
+source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#dad6241e20505d9640a1b73ae4c8e8289f78930f"
 dependencies = [
  "flate2",
  "serde",

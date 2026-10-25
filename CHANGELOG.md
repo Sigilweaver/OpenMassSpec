@@ -17,8 +17,9 @@ All notable changes to this project will be documented in this file.
   Arrow schema of `openmassspec-arrow` 4 (new columns, `precursor_ce_is_nce`
   replaced by `precursor_collision_energy_unit`).
 - Rust: depends on `openmassspec-core` 4 and `openmassspec-arrow` 4;
-  `openmassspec_io::arrow` follows them (`SpectrumBatchBuilder::push` returns
-  a `BatchError`). The reader crates must be released against Core 4 first.
+  `openmassspec_io::arrow` follows them, so the builder is at
+  `openmassspec_io::arrow::arrow_60::SpectrumBatchBuilder` and `push` returns
+  a `BatchError`. The reader crates must be released against Core 4 first.
 - The crate and Python packages are version 3.0.0.
 
 ### Behavior changes
