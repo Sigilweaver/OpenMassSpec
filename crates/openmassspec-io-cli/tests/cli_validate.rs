@@ -373,3 +373,60 @@ fn base64_encode(data: &[u8]) -> String {
     }
     String::from_utf8(out).unwrap()
 }
+
+fn validate_json(path: &std::path::Path) -> (Option<i32>, String) {
+    let out = Command::new(bin_path())
+        .arg("validate")
+        .arg("--json")
+        .arg(path)
+        .output()
+        .expect("run vendor2mzml");
+    (
+        out.status.code(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+    )
+}
+
+#[test]
+fn validate_truncated_mzml_fails_instead_of_reporting_ok() {
+    let good = tmp_path("trunc-src.mzML");
+    write_good_mzml(&good);
+    let bytes = std::fs::read(&good).expect("read good mzML");
+    let _ = std::fs::remove_file(&good);
+
+    // Cut inside the spectrumList, after the first spectrum has closed.
+    let text = String::from_utf8(bytes).expect("utf-8 mzML");
+    let first_end = text.find("</spectrum>").expect("a spectrum") + "</spectrum>".len();
+    let cut = first_end + (text.len() - first_end) / 3;
+    let path = tmp_path("truncated.mzML");
+    std::fs::write(&path, &text.as_bytes()[..cut]).expect("write truncated mzML");
+
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_ne!(code, Some(0), "truncated file validated: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_mzml_with_corrupt_payload_fails_instead_of_reporting_ok() {
+    let good = tmp_path("corrupt-src.mzML");
+    write_good_mzml(&good);
+    let text = std::fs::read_to_string(&good).expect("read good mzML");
+    let _ = std::fs::remove_file(&good);
+
+    // Damage the second spectrum's m/z payload.
+    let second = text
+        .match_indices("<binary>")
+        .nth(2)
+        .expect("a second payload")
+        .0;
+    let mut damaged = text.clone();
+    damaged.replace_range(second + 8..second + 12, "!!!!");
+    let path = tmp_path("corrupt.mzML");
+    std::fs::write(&path, damaged).expect("write corrupt mzML");
+
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_ne!(code, Some(0), "corrupt file validated: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+}
