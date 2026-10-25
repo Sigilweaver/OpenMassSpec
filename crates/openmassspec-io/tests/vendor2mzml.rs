@@ -27,6 +27,22 @@ fn first_existing(candidates: &[PathBuf]) -> PathBuf {
         .unwrap_or_else(|| candidates[0].clone())
 }
 
+/// `true` when the fixture is missing and the test should be skipped.
+/// Panics instead when `OPENMASSSPEC_REQUIRE_CORPUS=1`, so a CI job that
+/// downloads the corpus cannot pass with every vendor test skipped.
+fn skip_missing(path: &std::path::Path) -> bool {
+    if path.exists() {
+        return false;
+    }
+    assert!(
+        std::env::var("OPENMASSSPEC_REQUIRE_CORPUS").as_deref() != Ok("1"),
+        "OPENMASSSPEC_REQUIRE_CORPUS=1 but fixture is missing: {}",
+        path.display()
+    );
+    eprintln!("skipping {}: corpus not present", path.display());
+    true
+}
+
 fn manifest_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -113,8 +129,11 @@ fn input_tag(input: &std::path::Path) -> String {
 }
 
 fn smoke(input: PathBuf) {
-    if !input.exists() {
-        eprintln!("skipping {}: corpus not present", input.display());
+    smoke_with(input, openmassspec_io::ConvertOptions::new());
+}
+
+fn smoke_with(input: PathBuf, opts: openmassspec_io::ConvertOptions) {
+    if skip_missing(&input) {
         return;
     }
     let det = openmassspec_io::detect_format(&input).expect("detect");
@@ -124,8 +143,7 @@ fn smoke(input: PathBuf) {
         input_tag(&input),
         std::process::id()
     ));
-    openmassspec_io::convert_to_mzml(&det, &out, &openmassspec_io::ConvertOptions::new())
-        .expect("convert");
+    openmassspec_io::convert_to_mzml(&det, &out, &opts).expect("convert");
     let bytes = fs::read(&out).expect("read");
     assert!(
         bytes.len() > 4096,
@@ -171,14 +189,49 @@ fn shimadzu_lcd_qtof_smoke() {
     smoke(shimadzu_lcd_qtof_fixture());
 }
 
+/// openaraw reports a collision energy without its unit, so the writer
+/// needs the explicit opt-in; without it conversion is an error.
+fn agilent_options() -> openmassspec_io::ConvertOptions {
+    openmassspec_io::ConvertOptions::new().with_leniency(
+        openmassspec_io::core::Leniency::strict()
+            .with(openmassspec_io::core::Check::UnknownCollisionEnergyUnit),
+    )
+}
+
 #[test]
 fn agilent_smoke() {
-    smoke(agilent_fixture());
+    smoke_with(agilent_fixture(), agilent_options());
 }
 
 #[test]
 fn sciex_smoke() {
-    smoke(sciex_fixture());
+    // opensxraw does not report profile or centroid, so the writer needs
+    // the explicit opt-in; without it conversion is an error.
+    smoke_with(
+        sciex_fixture(),
+        openmassspec_io::ConvertOptions::new().with_leniency(
+            openmassspec_io::core::Leniency::strict()
+                .with(openmassspec_io::core::Check::UnknownScanMode),
+        ),
+    );
+}
+
+#[test]
+fn sciex_without_scan_mode_opt_in_is_an_error() {
+    let input = sciex_fixture();
+    if skip_missing(&input) {
+        return;
+    }
+    let det = openmassspec_io::detect_format(&input).expect("detect");
+    let out = std::env::temp_dir().join(format!("msio-sciex-strict-{}.mzML", std::process::id()));
+    let err = openmassspec_io::convert_to_mzml(
+        &det,
+        &out,
+        &openmassspec_io::ConvertOptions::new().with_centroid(true),
+    )
+    .expect_err("unknown scan mode must not convert by default");
+    let _ = fs::remove_file(&out);
+    assert!(err.to_string().contains("scan mode is unknown"), "{err}");
 }
 
 /// After converting with `ConvertOptions::with_centroid`, no spectrum in the output should
@@ -187,8 +240,11 @@ fn sciex_smoke() {
 /// holds regardless of the input file's actual mode mix, so it's a
 /// meaningful assertion even against real-world corpus data.
 fn centroid_smoke(input: PathBuf) {
-    if !input.exists() {
-        eprintln!("skipping {}: corpus not present", input.display());
+    centroid_smoke_with(input, openmassspec_io::ConvertOptions::new());
+}
+
+fn centroid_smoke_with(input: PathBuf, opts: openmassspec_io::ConvertOptions) {
+    if skip_missing(&input) {
         return;
     }
     let det = openmassspec_io::detect_format(&input).expect("detect");
@@ -198,12 +254,7 @@ fn centroid_smoke(input: PathBuf) {
         input_tag(&input),
         std::process::id()
     ));
-    openmassspec_io::convert_to_mzml(
-        &det,
-        &out,
-        &openmassspec_io::ConvertOptions::new().with_centroid(true),
-    )
-    .expect("convert");
+    openmassspec_io::convert_to_mzml(&det, &out, &opts.with_centroid(true)).expect("convert");
     let text = fs::read_to_string(&out).expect("read");
     assert!(
         !text.contains(r#"accession="MS:1000128""#),
@@ -240,12 +291,7 @@ fn shimadzu_centroid_smoke() {
 
 #[test]
 fn agilent_centroid_smoke() {
-    centroid_smoke(agilent_fixture());
-}
-
-#[test]
-fn sciex_centroid_smoke() {
-    centroid_smoke(sciex_fixture());
+    centroid_smoke_with(agilent_fixture(), agilent_options());
 }
 
 /// `stream()`/`metadata_only()` must agree with `collect()` on both the
@@ -254,8 +300,7 @@ fn sciex_centroid_smoke() {
 /// whole run into a `Vec`, without silently diverging from the existing
 /// two-pass API.
 fn stream_matches_collect(input: PathBuf) {
-    if !input.exists() {
-        eprintln!("skipping {}: corpus not present", input.display());
+    if skip_missing(&input) {
         return;
     }
     let det = openmassspec_io::detect_format(&input).expect("detect");

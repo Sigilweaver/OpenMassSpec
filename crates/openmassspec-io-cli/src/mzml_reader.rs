@@ -31,12 +31,33 @@ pub fn looks_like_mzml(path: &Path) -> bool {
 pub fn read_mzml_records(path: &Path) -> openmassspec_io::Result<Vec<SpectrumRecord>> {
     let reader =
         MzMLReader::open_path(path).map_err(|e| openmassspec_io::Error::Mzml(e.to_string()))?;
+    // The mzML reader ends its iterator at the first parse error (a
+    // truncated file, a corrupt payload) without saying so, so the number
+    // of spectra read is checked against the count the file declares.
+    let declared = reader.spectrum_count_hint();
     let mut out = Vec::new();
     for (i, spectrum) in reader.enumerate() {
         let raw: RawSpectrum = spectrum.into();
         out.push(spectrum_to_record(i, raw)?);
     }
+    check_declared_count(declared, out.len())?;
     Ok(out)
+}
+
+/// The file's `<spectrumList count>` must be known and equal to the number
+/// of spectra read.
+fn check_declared_count(declared: Option<u64>, read: usize) -> openmassspec_io::Result<()> {
+    match declared {
+        Some(n) if n == read as u64 => Ok(()),
+        Some(n) => Err(openmassspec_io::Error::Mzml(format!(
+            "read {read} of the {n} spectra the file declares; the file is truncated or a \
+             spectrum could not be parsed"
+        ))),
+        None => Err(openmassspec_io::Error::Mzml(format!(
+            "the file declares no spectrum count, so {read} spectra read cannot be \
+             checked for truncation"
+        ))),
+    }
 }
 
 /// Decode the m/z and intensity arrays of one spectrum.

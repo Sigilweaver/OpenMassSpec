@@ -104,11 +104,20 @@ vendor2mzml convert /data/sample.raw /tmp/sample.mzML --indexed
 Bruker `.d/` and Waters `.raw/` bundles), routes through the matching
 vendor crate, and writes indexed PSI-MS mzML 1.1.0.
 
-A spectrum or chromatogram the reader cannot decode is left out of the
-output, and `convert` prints how many were skipped as a warning on
-stderr; it still exits 0 when the file was written. Pass `--strict` to
-stop at the first unreadable record instead: it exits 1, keeps the
-partial output file, and says on stderr that the file is incomplete.
+A spectrum or chromatogram the reader cannot decode, or that fails the
+writer's checks (mismatched arrays, NaN or infinite values, a duplicate
+native id, ...), is left out of the output. `convert` prints how many were
+skipped and why (the first few causes) on stderr and exits 4; exit 0 means
+nothing was left out. Pass `--strict` to stop at the first such record
+instead: it exits 1, keeps the partial output file, and says on stderr that
+the file is incomplete.
+
+A spectrum whose reader does not say whether it is profile or centroid
+(SCIEX `.wiff` today) stops the conversion. `--allow unknown_scan_mode`
+writes those spectra with no profile/centroid term and a warning
+userParam on each, and `--centroid` leaves them unchanged. `--allow
+dangling_precursor_ref` drops a precursor reference to a spectrum that is
+not in the output, with a warning.
 
 ### From Rust
 

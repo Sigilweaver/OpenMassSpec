@@ -15,9 +15,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use openmassspec_core::conformance::assert_iter_invariants;
-use openmassspec_core::{RecordErrorPolicy, SpectrumRecord, WriteSummary};
+use openmassspec_core::{Check, Leniency, RecordErrorPolicy, SpectrumRecord, WriteSummary};
 use openmassspec_io::{
-    collect, collect_centroided, convert_to_mzml_writer, detect_format, ConvertOptions, Detected,
+    collect, collect_centroided_with, convert_to_mzml_writer, detect_format, ConvertOptions,
+    Detected,
 };
 
 #[derive(Parser, Debug)]
@@ -67,9 +68,19 @@ struct ConvertArgs {
     /// Fail at the first spectrum or chromatogram that cannot be decoded
     /// (exit 1; the partial output file is kept and reported as
     /// incomplete). By default unreadable records are left out of the
-    /// output and their count is printed on stderr as a warning.
+    /// output, their count is printed on stderr as a warning, and the
+    /// exit status is 4.
     #[arg(long)]
     strict: bool,
+    /// Let a strict check continue with a warning on the affected record
+    /// instead of failing. Repeatable. Checks: `unknown_scan_mode` (the
+    /// reader did not say whether a spectrum is profile or centroid: it is
+    /// written with no such term, and `--centroid` leaves it unchanged) and
+    /// `dangling_precursor_ref` (a precursor names a spectrum that is not in
+    /// the output: the reference is dropped) and `unknown_collision_energy_unit`
+    /// (a collision energy with no unit is written as a unit-less userParam).
+    #[arg(long = "allow", value_name = "CHECK", value_parser = clap::value_parser!(Check))]
+    allow: Vec<Check>,
     /// Emit timing and record counts on stderr in the chosen format.
     #[arg(long, value_enum)]
     profile: Option<ProfileFormat>,
@@ -96,6 +107,10 @@ struct InfoArgs {
     /// set. Ignored otherwise.
     #[arg(long)]
     centroid_min_intensity: Option<f32>,
+    /// With `--centroid`, let a strict check continue with a warning
+    /// (see `convert --help`). Repeatable.
+    #[arg(long = "allow", value_name = "CHECK", value_parser = clap::value_parser!(Check))]
+    allow: Vec<Check>,
     /// Emit the summary as a single JSON object on stdout.
     #[arg(long)]
     json: bool,
@@ -128,7 +143,22 @@ fn main() -> ExitCode {
 // convert
 // ---------------------------------------------------------------------
 
+/// Report an input that cannot be stat-ed (missing, permission denied, I/O
+/// error) as that error, so it is not mistaken for an unsupported format.
+fn check_input_readable(input: &Path) -> Result<(), ExitCode> {
+    match std::fs::metadata(input) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!("error: cannot read {}: {e}", input.display());
+            Err(ExitCode::from(1))
+        }
+    }
+}
+
 fn run_convert(args: ConvertArgs) -> ExitCode {
+    if let Err(code) = check_input_readable(&args.input) {
+        return code;
+    }
     let Some(detected) = detect_format(&args.input) else {
         eprintln!(
             "error: {} does not look like a supported vendor format",
@@ -163,7 +193,8 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
         .with_indexed(args.indexed)
         .with_centroid(args.centroid)
         .with_centroid_min_intensity(args.centroid_min_intensity)
-        .with_record_error_policy(policy);
+        .with_record_error_policy(policy)
+        .with_leniency(leniency(&args.allow));
     // The writer holds encoded spectra until the run is read to the end
     // (so <spectrumList count> is exact), spilling past 64 MiB to a
     // temporary file. Put that file next to the output, where the space
@@ -181,11 +212,12 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    if let Err(e) = writer.flush() {
-        eprintln!("error: flush: {e}");
+    if let Err(e) = writer.finish() {
+        eprintln!("error: finishing {}: {e}", args.output.display());
+        eprintln!("  {} is incomplete", args.output.display());
         return ExitCode::from(1);
     }
-    warn_skipped(&summary);
+    let warned = warn_summary(&summary);
     report(
         args.profile,
         &args.output,
@@ -193,7 +225,21 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
         &summary,
         t_start.elapsed().as_secs_f64(),
     );
-    ExitCode::SUCCESS
+    if warned {
+        // The output is written and valid, but records were left out or
+        // could not be reconciled: say so in the exit status too.
+        ExitCode::from(EXIT_INCOMPLETE)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+/// Exit status of `convert` when the output is complete as written but
+/// records were left out or the record count could not be reconciled.
+const EXIT_INCOMPLETE: u8 = 4;
+
+fn leniency(allow: &[Check]) -> Leniency {
+    allow.iter().cloned().collect()
 }
 
 /// Directory for the writer's spool file: the directory of `output`, or
@@ -205,7 +251,42 @@ fn spool_dir_for(output: &Path) -> PathBuf {
     }
 }
 
-fn open_writer(path: &Path) -> std::io::Result<Box<dyn Write>> {
+/// Output sink that keeps its concrete type, so the gzip trailer and the
+/// final buffer flush can be finished with their errors reported (both are
+/// ignored when these types are merely dropped).
+enum OutWriter {
+    Plain(BufWriter<File>),
+    Gz(GzEncoder<BufWriter<File>>),
+}
+
+impl Write for OutWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(w) => w.write(buf),
+            Self::Gz(w) => w.write(buf),
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Plain(w) => w.flush(),
+            Self::Gz(w) => w.flush(),
+        }
+    }
+}
+
+impl OutWriter {
+    /// Write the gzip trailer (if any), flush, and sync the file to disk.
+    fn finish(self) -> std::io::Result<()> {
+        let buf = match self {
+            Self::Plain(w) => w,
+            Self::Gz(w) => w.finish()?,
+        };
+        let file = buf.into_inner().map_err(|e| e.into_error())?;
+        file.sync_all()
+    }
+}
+
+fn open_writer(path: &Path) -> std::io::Result<OutWriter> {
     let f = File::create(path)?;
     let buf = BufWriter::with_capacity(2 << 20, f);
     let is_gz = path
@@ -213,25 +294,54 @@ fn open_writer(path: &Path) -> std::io::Result<Box<dyn Write>> {
         .and_then(|n| n.to_str())
         .is_some_and(|n| n.ends_with(".gz"));
     if is_gz {
-        Ok(Box::new(GzEncoder::new(buf, Compression::default())))
+        Ok(OutWriter::Gz(GzEncoder::new(buf, Compression::default())))
     } else {
-        Ok(Box::new(buf))
+        Ok(OutWriter::Plain(buf))
     }
 }
 
-/// Print the skipped-record warning. Skipping is the default, so the count
-/// must always reach the user.
-fn warn_skipped(summary: &WriteSummary) {
-    if summary.skipped() == 0 {
-        return;
+/// Print every warning the summary carries. Skipping is the default, so
+/// the counts and causes must always reach the user. Returns `true` when
+/// records were left out or the record count did not reconcile.
+fn warn_summary(summary: &WriteSummary) -> bool {
+    let mut incomplete = false;
+    if summary.skipped() > 0 {
+        incomplete = true;
+        eprintln!(
+            "warning: skipped {} record(s) ({} spectra, {} chromatograms; {} spectra and {} \
+             chromatograms were readable but failed the writer's checks)",
+            summary.skipped(),
+            summary.spectra_skipped,
+            summary.chromatograms_skipped,
+            summary.spectra_invalid,
+            summary.chromatograms_invalid
+        );
+        for issue in &summary.issues {
+            let id = issue.record_id.as_deref().unwrap_or("-");
+            eprintln!(
+                "  {:?} #{} ({id}): {}",
+                issue.kind, issue.position, issue.cause
+            );
+        }
+        if summary.issues_truncated > 0 {
+            eprintln!(
+                "  ... and {} more; rerun with --strict to stop at the first one",
+                summary.issues_truncated
+            );
+        }
     }
-    eprintln!(
-        "warning: skipped {} unreadable record(s) ({} spectra, {} chromatograms); \
-         rerun with --strict to stop at the first one and see its error",
-        summary.skipped(),
-        summary.spectra_skipped,
-        summary.chromatograms_skipped
-    );
+    if let Some(m) = &summary.spectrum_count_mismatch {
+        incomplete = true;
+        eprintln!(
+            "warning: the reader announced {} spectra but {} were written or skipped; \
+             spectra may be missing",
+            m.announced, m.accounted
+        );
+    }
+    for (code, n) in &summary.warning_counts {
+        eprintln!("warning: {n} record(s) written with warning '{code}' (see the userParams)");
+    }
+    incomplete
 }
 
 fn report(
@@ -287,6 +397,9 @@ fn report(
 // ---------------------------------------------------------------------
 
 fn run_info(args: InfoArgs) -> ExitCode {
+    if let Err(code) = check_input_readable(&args.input) {
+        return code;
+    }
     let Some(detected) = detect_format(&args.input) else {
         eprintln!(
             "error: {} does not look like a supported vendor format",
@@ -296,7 +409,11 @@ fn run_info(args: InfoArgs) -> ExitCode {
     };
     let t_start = Instant::now();
     let collect_result = if args.centroid {
-        collect_centroided(&detected, args.centroid_min_intensity)
+        collect_centroided_with(
+            &detected,
+            args.centroid_min_intensity,
+            &leniency(&args.allow),
+        )
     } else {
         collect(&detected)
     };
@@ -425,11 +542,9 @@ fn summarize(
             None => "unk",
         };
         *polarity_counts.entry(key.to_string()).or_insert(0) += 1;
-        if r.retention_time_sec < rt_min {
-            rt_min = r.retention_time_sec;
-        }
-        if r.retention_time_sec > rt_max {
-            rt_max = r.retention_time_sec;
+        if let Some(rt) = r.retention_time_sec {
+            rt_min = rt_min.min(rt);
+            rt_max = rt_max.max(rt);
         }
     }
     if !rt_min.is_finite() {

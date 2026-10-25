@@ -1166,8 +1166,6 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "openaraw"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb845b69804da12eff1eaadbc05a9d3dab31c637f450427abc484c7a9d4d7239"
 dependencies = [
  "byteorder",
  "log",
@@ -1178,20 +1176,19 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-arrow"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5aceb590a66da952a89d06cc5251ef254f62666d222d533dff052fc21a174d2"
+version = "4.0.0"
+source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#dad6241e20505d9640a1b73ae4c8e8289f78930f"
 dependencies = [
  "arrow-array",
  "arrow-schema",
  "openmassspec-core",
+ "thiserror",
 ]
 
 [[package]]
 name = "openmassspec-core"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d11eb6376e628cb354ac492308d43de89994a4292bab74b8393bca5aa12fe463"
+version = "4.0.0"
+source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#dad6241e20505d9640a1b73ae4c8e8289f78930f"
 dependencies = [
  "flate2",
  "serde",
@@ -1200,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "openaraw",
  "openmassspec-arrow",
@@ -1215,7 +1212,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-cli"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "clap",
  "flate2",
@@ -1226,7 +1223,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-py"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "arrow",
  "numpy",
@@ -1238,8 +1235,6 @@ dependencies = [
 [[package]]
 name = "opensxraw"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee42f58967c5aea601210afb056da4d00a75b041fae26482d44b5fd02a489ff3"
 dependencies = [
  "byteorder",
  "cfb",
@@ -1251,8 +1246,6 @@ dependencies = [
 [[package]]
 name = "openszraw"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18fbdeeda0080dcbbde2095d56b67ff17ea6484a6ba5b364ac6bdf715159c541"
 dependencies = [
  "byteorder",
  "cfb",
@@ -1263,9 +1256,7 @@ dependencies = [
 
 [[package]]
 name = "opentfraw"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f20dbde5390d3755212d37b8f35c72d81962b4bf7af1e8dc3155736d89fbb8a9"
+version = "3.1.0"
 dependencies = [
  "openmassspec-core",
  "roxmltree",
@@ -1275,8 +1266,6 @@ dependencies = [
 [[package]]
 name = "opentimstdf"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebbe2453a804944726c66f6e8de4b33f820906bdece73fd3c5054bff994e1338"
 dependencies = [
  "log",
  "openmassspec-core",
@@ -1288,8 +1277,6 @@ dependencies = [
 [[package]]
 name = "openwraw"
 version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbde5766b6f6adb729a86cdc6ffe7d778e996af005da8143751e9edf2d718ab5"
 dependencies = [
  "log",
  "openmassspec-core",

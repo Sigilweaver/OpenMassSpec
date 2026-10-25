@@ -167,6 +167,10 @@ jobs:
           du -sh corpus
 
       - name: cargo test
+        env:
+          # Only the ubuntu job downloads the corpus; there a missing fixture
+          # fails the test instead of skipping it.
+          OPENMASSSPEC_REQUIRE_CORPUS: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
         run: cargo test --workspace --all-features
 
       - name: vendor2mzml validate against shared corpus (best-effort)

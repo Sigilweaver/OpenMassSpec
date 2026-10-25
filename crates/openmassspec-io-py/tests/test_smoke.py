@@ -64,8 +64,14 @@ def test_to_mzml_roundtrip(vendor: str, tmp_path: Path):
     assert set(summary) == {
         "spectra_written",
         "spectra_skipped",
+        "spectra_invalid",
         "chromatograms_written",
         "chromatograms_skipped",
+        "chromatograms_invalid",
+        "warning_counts",
+        "issues",
+        "issues_truncated",
+        "spectrum_count_mismatch",
     }
 
 
@@ -110,6 +116,53 @@ def test_iter_spectra_yields_numpy_arrays(vendor: str):
 
 
 @pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_spectrum_getters_are_repeatable(vendor: str):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    for spec in opio.iter_spectra(str(path)):
+        if len(spec.mz) == 0:
+            continue
+        first_mz = spec.mz.copy()
+        first_int = spec.intensity.copy()
+        # A second read returns the same data, not an empty array.
+        assert np.array_equal(spec.mz, first_mz)
+        assert np.array_equal(spec.intensity, first_int)
+        # Derived values do not depend on which arrays were read before.
+        assert spec.total_ion_current == pytest.approx(float(first_int.sum()), rel=1e-4) or (
+            spec.reported_total_ion_current is not None
+        )
+        assert spec.base_peak_mz is not None
+        assert f"n_peaks={len(first_mz)}" in repr(spec)
+        mob_1 = spec.inv_mobility_per_peak
+        mob_2 = spec.inv_mobility_per_peak
+        assert (mob_1 is None) == (mob_2 is None)
+        if mob_1 is not None:
+            assert np.array_equal(mob_1, mob_2)
+        break
+    else:
+        pytest.skip("no non-empty spectrum")
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_analyzer_labels_match_arrow(vendor: str):
+    if not hasattr(opio, "read_arrow"):
+        pytest.skip("built without arrow feature")
+    pytest.importorskip("pyarrow")
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    py_labels = []
+    for spec in opio.iter_spectra(str(path)):
+        py_labels.append(spec.analyzer)
+        if len(py_labels) == 64:
+            break
+    batch = next(iter(opio.read_arrow(str(path), batch_size=64)))
+    arrow_labels = batch.column("analyzer").to_pylist()[: len(py_labels)]
+    assert py_labels == arrow_labels
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
 def test_to_mzml_centroid_removes_profile_spectra(vendor: str, tmp_path: Path):
     path = CORPORA[vendor]
     if path is None:
@@ -151,6 +204,14 @@ def test_read_arrow(vendor: str):
         if total >= 64:
             break
     assert total > 0
+
+
+def test_unknown_check_name_is_a_value_error(tmp_path: Path):
+    path = CORPORA["thermo"]
+    if path is None:
+        pytest.skip("no corpus for thermo")
+    with pytest.raises(ValueError, match="unknown_scan_mode"):
+        opio.to_mzml(str(path), str(tmp_path / "x.mzML"), allow=["nope"])
 
 
 if __name__ == "__main__":

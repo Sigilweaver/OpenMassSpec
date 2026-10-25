@@ -50,6 +50,11 @@ fn spectrum_list(path: &Path) -> (usize, Vec<usize>) {
 fn convert_spools_next_to_the_output_not_in_tmpdir() {
     let input = bruker_fixture();
     if !input.exists() {
+        assert!(
+            std::env::var("OPENMASSSPEC_REQUIRE_CORPUS").as_deref() != Ok("1"),
+            "OPENMASSSPEC_REQUIRE_CORPUS=1 but fixture is missing: {}",
+            input.display()
+        );
         eprintln!("skipping: corpus not present at {}", input.display());
         return;
     }
