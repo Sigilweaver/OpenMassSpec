@@ -1198,7 +1198,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "openaraw",
  "openmassspec-arrow",
@@ -1213,7 +1213,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-cli"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "clap",
  "flate2",
@@ -1224,7 +1224,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-py"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "arrow",
  "numpy",
