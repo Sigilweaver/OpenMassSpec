@@ -65,18 +65,36 @@ try:
     from openmassspec_io import detect as detect_format  # type: ignore[import-not-found]
     try:
         from openmassspec_io import read_arrow  # type: ignore[import-not-found]
-    except ImportError:  # pragma: no cover - wheel built without Arrow
-        read_arrow = None  # type: ignore[assignment]
-except ImportError:  # pragma: no cover - openmassspec_io is a hard dep
-    Spectrum = None  # type: ignore[assignment]
-    Chromatogram = None  # type: ignore[assignment]
-    RunInfo = None  # type: ignore[assignment]
-    detect_format = None  # type: ignore[assignment]
-    iter_spectra = None  # type: ignore[assignment]
-    read_chromatograms = None  # type: ignore[assignment]
-    read_arrow = None  # type: ignore[assignment]
-    run_info = None  # type: ignore[assignment]
-    to_mzml = None  # type: ignore[assignment]
+    except ImportError as _arrow_err:  # pragma: no cover - wheel built without Arrow
+        _ARROW_IMPORT_ERROR = _arrow_err
+
+        def read_arrow(*args, **kwargs):  # type: ignore[misc]
+            raise ImportError(
+                f"this openmassspec_io wheel was built without Arrow support: {_ARROW_IMPORT_ERROR}"
+            ) from _ARROW_IMPORT_ERROR
+    _IO_IMPORT_ERROR: Optional[ImportError] = None
+except ImportError as _err:  # pragma: no cover - openmassspec_io is a hard dep
+    # Keep ``import openmassspec`` working (``__version__`` and ``VENDORS``
+    # stay usable) but make every reader entry point raise the original
+    # import failure, which names the missing or ABI-mismatched module.
+    _IO_IMPORT_ERROR = _err
+
+    def _unavailable(name: str):
+        def _raise(*args, **kwargs):
+            raise ImportError(
+                f"openmassspec.{name} needs openmassspec_io, which failed to import: {_IO_IMPORT_ERROR}"
+            ) from _IO_IMPORT_ERROR
+
+        _raise.__name__ = name
+        return _raise
+
+    detect_format = _unavailable("detect_format")  # type: ignore[assignment]
+    iter_spectra = _unavailable("iter_spectra")  # type: ignore[assignment]
+    read_chromatograms = _unavailable("read_chromatograms")  # type: ignore[assignment]
+    read_arrow = _unavailable("read_arrow")  # type: ignore[assignment]
+    run_info = _unavailable("run_info")  # type: ignore[assignment]
+    to_mzml = _unavailable("to_mzml")  # type: ignore[assignment]
+    Spectrum = Chromatogram = RunInfo = None  # type: ignore[assignment,misc]
 
 __all__ = [
     "__version__",
@@ -117,11 +135,6 @@ def detect(path: str | os.PathLike[str]) -> Optional[str]:
     The check is purely structural; no vendor reader needs to be
     importable.
     """
-    if detect_format is None:
-        raise ImportError(
-            "openmassspec_io is required for detect(); it is a hard "
-            "dependency of the openmassspec base install"
-        )
     return detect_format(Path(path))
 
 

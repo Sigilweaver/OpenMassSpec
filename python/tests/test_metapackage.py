@@ -161,8 +161,8 @@ def test_open_run_unknown_raises(tmp_path: Path):
 def test_openmassspec_io_reexports_present():
     # The base install pulls openmassspec_io; the re-exports should be
     # importable callables. If openmassspec_io is genuinely missing the
-    # module falls back to None and we skip.
-    if openmassspec.to_mzml is None:
+    # module keeps raising stubs and we skip.
+    if openmassspec._IO_IMPORT_ERROR is not None:
         pytest.skip("openmassspec_io not importable in this environment")
     assert callable(openmassspec.to_mzml)
     assert callable(openmassspec.iter_spectra)
