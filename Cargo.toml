@@ -28,3 +28,10 @@ openszraw = "0.3.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# Temporary: build against the unreleased openmassspec-core / openmassspec-arrow
+# changes (OpenMassSpecCore PRs #30 and #31). Remove this block, and bump the
+# dependency versions above, once those are released.
+[patch.crates-io]
+openmassspec-core = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", branch = "fix/arrow-checked-push" }
+openmassspec-arrow = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", branch = "fix/arrow-checked-push" }

@@ -1179,8 +1179,7 @@ dependencies = [
 [[package]]
 name = "openmassspec-arrow"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5aceb590a66da952a89d06cc5251ef254f62666d222d533dff052fc21a174d2"
+source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#9973d1973d94fa4dd68dc667d0d87e5964f3bc41"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -1190,8 +1189,7 @@ dependencies = [
 [[package]]
 name = "openmassspec-core"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d11eb6376e628cb354ac492308d43de89994a4292bab74b8393bca5aa12fe463"
+source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?branch=fix%2Farrow-checked-push#9973d1973d94fa4dd68dc667d0d87e5964f3bc41"
 dependencies = [
  "flate2",
  "serde",

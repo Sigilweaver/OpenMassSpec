@@ -4,6 +4,76 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### API breaks
+
+- Python: `Spectrum.analyzer`, `precursor["analyzer"]` and
+  `RunInfo.analyzers` use the stack-wide labels (`"tof"`, not `"tofms"`).
+  `precursor["ce_is_nce"]` is `None` when the unit is unknown, and
+  `precursor["collision_energy_unit"]` (`"ev"`, `"nce"` or `None`) is new.
+  `to_mzml` returns `warning_counts`, `issues`, `issues_truncated`,
+  `spectra_invalid`, `chromatograms_invalid` and `spectrum_count_mismatch`
+  in its dict.
+- Rust: `openmassspec_io::arrow` follows `openmassspec-arrow`
+  (`SpectrumBatchBuilder::push` returns a `Result`).
+- Requires the `openmassspec-core` release that adds `Leniency`, `Warning`
+  and `WriteSummary::issues`.
+
+### Behavior changes
+
+Files that convert today can fail or read differently:
+
+- Thermo `.raw` files are read with profile export on. Profile scans are
+  written as profile data. They used to be written as sparse centroid lists
+  labelled "profile spectrum", contrary to the docs. Output is larger, and
+  `collect`, `stream`, `iter_spectra` and `read_arrow` return profile arrays
+  for profile scans.
+- `--centroid` (and `centroid=True`, `ConvertOptions::with_centroid`) picks
+  peaks only from spectra declared profile. On the Thermo fixture the old
+  code re-centroided peak lists and kept 66,200 of 199,722 peaks, moving
+  every peak; it now keeps about 201,000 (centroided from the profile
+  data). A spectrum with no declared scan mode is an error, and a "profile"
+  spectrum that is a sparse peak list is an error.
+- A spectrum whose reader gives no scan mode (SCIEX `.wiff`) is an error.
+  It used to be written as "profile spectrum". Opt in to writing it
+  unlabelled, with a warning on each such spectrum, via `--allow
+  unknown_scan_mode`, `ConvertOptions::with_leniency`, or
+  `allow=["unknown_scan_mode"]` in Python; `--centroid` then leaves those
+  spectra unchanged.
+- `vendor2mzml convert` exits 4 when records were skipped or the reader's
+  spectrum count could not be reconciled, and prints the cause of each of the
+  first skipped records. It used to exit 0 and print only a count.
+- `vendor2mzml validate` on mzML fails when fewer spectra can be read than
+  the `<spectrumList count>` declares (a truncated file or a corrupt
+  payload), and when the file declares no count. It used to report ok.
+- The writer rejects malformed records and collision energies with no unit
+  (see the `openmassspec-core` changelog): `convert` counts them as skipped
+  and lists the causes, `--strict` stops on them. Agilent `.d` files carry a
+  collision energy with no unit today, so they need `--allow
+  unknown_collision_energy_unit` until `openaraw` states it.
+- `CID` precursors are written as collision-induced dissociation
+  (MS:1000133) rather than beam-type CID when the analyzer is FTMS; no
+  `scanWindowList` is written until the readers supply `scan_window`.
+- `vendor2mzml convert` and `info` report an unreadable input path as that
+  I/O error instead of "does not look like a supported vendor format".
+- The gzip trailer and the final flush are checked: a failure there is an
+  error (exit 1), and the output file is synced to disk.
+- `import openmassspec` no longer hides a failed `openmassspec_io` import:
+  the reader functions raise `ImportError` chained from the original error.
+- Python `Spectrum`: `mz`, `intensity` and `inv_mobility_per_peak` return
+  the same data on every access (they were empty after the first), and
+  `total_ion_current`, `base_peak_*` and `repr` no longer depend on which
+  arrays were read before.
+
+### Added
+
+- `ConvertOptions::with_leniency` (also applies to centroiding);
+  `vendor2mzml convert --allow CHECK` and `info --allow CHECK` (repeatable);
+  Python `allow=` on `to_mzml`, `iter_spectra` and `read_arrow`;
+  `collect_centroided_with` and `stream_centroided_with`;
+  `Spectrum.warnings`.
+- Tests that need the corpus fail instead of skipping when
+  `OPENMASSSPEC_REQUIRE_CORPUS=1`.
+
 ### Changed
 
 - Retry CI fixture downloads with exponential backoff and Retry-After support,
