@@ -31,8 +31,10 @@
 //! # Centroiding
 //!
 //! [`ConvertOptions::with_centroid`], [`collect_centroided`], and
-//! [`stream_centroided`] centroid every profile-mode spectrum first via
-//! [`openmassspec_core::Centroided`]. Centroiding is always opt-in.
+//! [`stream_centroided`] centroid every spectrum declared profile first via
+//! [`openmassspec_core::Centroided`]. Centroiding is always opt-in. A
+//! spectrum with no declared scan mode is an error unless
+//! [`ConvertOptions::with_leniency`] allows `Check::UnknownScanMode`.
 //!
 //! # Example
 //!
@@ -58,8 +60,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use openmassspec_core::{
-    ChromatogramIter, ChromatogramRecord, Compression, CvTerm, RecordErrorPolicy, RunMetadata,
-    SpectrumIter, SpectrumRecord, SpectrumSource, WriteOptions, WriteSummary,
+    ChromatogramIter, ChromatogramRecord, Compression, CvTerm, Leniency, RecordErrorPolicy,
+    RunMetadata, SpectrumIter, SpectrumRecord, SpectrumSource, WriteOptions, WriteSummary,
 };
 
 mod error;
@@ -298,8 +300,12 @@ fn with_source_inner<T>(
                 let filename = path
                     .file_name()
                     .map_or_else(|| "unknown.raw".into(), |n| n.to_string_lossy());
+                // Profile data is exported (the `include_profile` argument):
+                // the source labels each spectrum with its scan mode, so a
+                // profile scan reads as profile instead of a centroid list
+                // tagged profile.
                 let mut src =
-                    opentfraw::mzml::OpenTfRawSource::new(&raw, &mut file, &filename, false);
+                    opentfraw::mzml::OpenTfRawSource::new(&raw, &mut file, &filename, true);
                 f(&mut src)
             }
             #[cfg(not(feature = "thermo"))]
@@ -353,10 +359,12 @@ fn with_source_inner<T>(
 fn with_centroided_source<T>(
     detected: &Detected,
     min_intensity: Option<f32>,
+    leniency: &Leniency,
     f: impl FnOnce(&mut dyn SpectrumSource) -> Result<T>,
 ) -> Result<T> {
     with_source(detected, |src| {
-        let mut centroided = openmassspec_core::Centroided::new(DynSource(src));
+        let mut centroided =
+            openmassspec_core::Centroided::new(DynSource(src)).with_leniency(leniency.clone());
         if let Some(v) = min_intensity {
             centroided = centroided.with_min_intensity(v);
         }
@@ -416,8 +424,9 @@ pub struct ConvertOptions {
     /// When centroiding, discard picked peaks below this intensity.
     /// Ignored unless [`centroid`](Self::centroid) is set.
     pub centroid_min_intensity: Option<f32>,
-    /// Writer options from `openmassspec-core`: binary array compression
-    /// and the record-error policy.
+    /// Writer options from `openmassspec-core`: binary array compression,
+    /// the record-error policy and the [`Leniency`] (which also applies to
+    /// centroiding).
     pub write: WriteOptions,
 }
 
@@ -445,6 +454,14 @@ impl ConvertOptions {
     #[must_use]
     pub fn with_centroid_min_intensity(mut self, min_intensity: impl Into<Option<f32>>) -> Self {
         self.centroid_min_intensity = min_intensity.into();
+        self
+    }
+
+    /// Checks that may continue with a warning on the record instead of
+    /// failing (default: none). Applies to writing and to centroiding.
+    #[must_use]
+    pub fn with_leniency(mut self, leniency: Leniency) -> Self {
+        self.write = self.write.with_leniency(leniency);
         self
     }
 
@@ -515,7 +532,12 @@ pub fn convert_to_mzml_writer<W: Write>(
         Ok(summary)
     };
     if opts.centroid {
-        with_centroided_source(detected, opts.centroid_min_intensity, write)
+        with_centroided_source(
+            detected,
+            opts.centroid_min_intensity,
+            &opts.write.leniency,
+            write,
+        )
     } else {
         with_source(detected, write)
     }
@@ -569,7 +591,25 @@ pub fn collect_centroided(
     detected: &Detected,
     min_intensity: Option<f32>,
 ) -> Result<(Vec<SpectrumRecord>, RunMetadata)> {
-    with_centroided_source(detected, min_intensity, collect_from)
+    collect_centroided_with(detected, min_intensity, &Leniency::strict())
+}
+
+/// Like [`collect_centroided`], with a [`Leniency`]. With
+/// `Check::UnknownScanMode` allowed, a spectrum whose scan mode the reader
+/// did not declare passes through unchanged with a
+/// `WarningKind::CentroidNotApplied` warning instead of being an error.
+///
+/// # Errors
+///
+/// As for [`collect`], plus a record error for a spectrum that cannot be
+/// centroided (unknown scan mode under `Require`, or a "profile" spectrum
+/// that is a peak list).
+pub fn collect_centroided_with(
+    detected: &Detected,
+    min_intensity: Option<f32>,
+    leniency: &Leniency,
+) -> Result<(Vec<SpectrumRecord>, RunMetadata)> {
+    with_centroided_source(detected, min_intensity, leniency, collect_from)
 }
 
 /// Like [`collect`], but visits each spectrum through `on_spectrum` as soon
@@ -602,7 +642,27 @@ pub fn stream_centroided(
     min_intensity: Option<f32>,
     mut on_spectrum: impl FnMut(SpectrumRecord) -> Result<()>,
 ) -> Result<RunMetadata> {
-    with_centroided_source(detected, min_intensity, |src| {
+    stream_centroided_with(
+        detected,
+        min_intensity,
+        &Leniency::strict(),
+        &mut on_spectrum,
+    )
+}
+
+/// Like [`stream_centroided`], with a [`Leniency`] (see
+/// [`collect_centroided_with`]).
+///
+/// # Errors
+///
+/// As for [`stream_centroided`].
+pub fn stream_centroided_with(
+    detected: &Detected,
+    min_intensity: Option<f32>,
+    leniency: &Leniency,
+    mut on_spectrum: impl FnMut(SpectrumRecord) -> Result<()>,
+) -> Result<RunMetadata> {
+    with_centroided_source(detected, min_intensity, leniency, |src| {
         stream_from(src, &mut on_spectrum)
     })
 }
