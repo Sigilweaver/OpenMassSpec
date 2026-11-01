@@ -18,7 +18,7 @@ openmassspec-core = { workspace = true }
 openmassspec-io = { path = "../openmassspec-io", features = ["all"] }
 clap = { version = "4.5", features = ["derive"] }
 flate2 = "1.0"
-mzdata = { version = "0.67.1", default-features = false, features = ["mzml"] }
+mzdata = { version = "0.68.0", default-features = false, features = ["mzml"] }
 
 [lints]
 workspace = true
