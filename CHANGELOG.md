@@ -9,6 +9,15 @@ All notable changes to this project will be documented in this file.
 - Retry CI fixture downloads with exponential backoff and Retry-After support,
   and report the failing URL when retries are exhausted.
 
+### Security
+
+- Updated the transitive `zstd` 0.14.3, `zstd-safe` 8.2.0 and `zstd-sys`
+  2.1.2 (via `opentimstdf`) in the lockfile, fixing
+  RUSTSEC-2026-0391, RUSTSEC-2026-0398, RUSTSEC-2026-0403 and
+  RUSTSEC-2026-0410, plus the `zstd-safe` unsoundness warnings
+  RUSTSEC-2026-0395 through -0397, -0399 through -0402 and -0404 through
+  -0406. Lockfile-only change; no code or API changes.
+
 ## [2.0.0] - 2026-10-11
 
 ### Breaking (Rust)
