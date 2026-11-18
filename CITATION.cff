@@ -20,8 +20,8 @@ abstract: >
   vendor-specific reader crates (OpenTFRaw, OpenTimsTDF, OpenWRaw).
 license: "Apache-2.0"
 license-url: "https://github.com/Sigilweaver/OpenMassSpec/blob/main/LICENSE"
-date-released: "2026-07-10"
-version: "1.0.0"
+date-released: "2026-10-11"
+version: "2.0.0"
 keywords:
   - mass spectrometry
   - proteomics
@@ -32,5 +32,5 @@ keywords:
   - Apache Arrow
 identifiers:
   - type: doi
-    value: "10.5281/zenodo.20470595"
-    description: "Zenodo DOI"
+    value: "10.5281/zenodo.20470594"
+    description: "Zenodo concept DOI (resolves to the latest archived version)"
