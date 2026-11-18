@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Updated `opentimstdf` to 3.0.1, which moves `rusqlite` 0.40.2 to 0.42.0
+  and `libsqlite3-sys` 0.38.2 to 0.40.0 in the lockfile, fixing
+  RUSTSEC-2026-0459. The `bruker` Python extra now requires
+  `opentimstdf>=3.0.1,<4`. No code or API changes.
 - Updated the transitive `zstd` 0.14.3, `zstd-safe` 8.2.0 and `zstd-sys`
   2.1.2 (via `opentimstdf`) in the lockfile, fixing
   RUSTSEC-2026-0391, RUSTSEC-2026-0398, RUSTSEC-2026-0403 and
