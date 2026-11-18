@@ -147,6 +147,13 @@ jobs:
           - macos-latest
           - windows-latest
         python: ["3.9", "3.12"]
+        # setup-python has no 3.9 on ubuntu-latest (26.04), so 3.9 runs on 24.04.
+        exclude:
+          - os: ubuntu-latest
+            python: "3.9"
+        include:
+          - os: ubuntu-24.04
+            python: "3.9"
     defaults:
       run:
         # windows-latest defaults to pwsh; the steps below rely on POSIX
