@@ -147,3 +147,10 @@ jobs:
         with:
           packages-dir: dist
           skip-existing: true
+
+  docs-live:
+    name: Move docs-live to the release
+    needs: [cargo-publish, publish-openmassspec-io, publish-openmassspec]
+    permissions:
+      contents: write
+    uses: Sigilweaver/.github/.github/workflows/docs-live.yml@main
