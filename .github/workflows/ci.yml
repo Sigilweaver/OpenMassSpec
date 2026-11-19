@@ -136,8 +136,44 @@ jobs:
       - name: cargo check (MSRV)
         run: cargo check --workspace --all-features
 
+  # The Python smoke jobs are required checks, so they must report on every PR.
+  # They always start; their steps run only on pushes to main and on PRs that
+  # touch the Python bindings, the crate they wrap, or their build inputs.
+  python-changes:
+    name: Python bindings changed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # If the file list cannot be read, run everything rather than skip.
+          if ! files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename'); then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if echo "$files" | grep -Eq '^(crates/openmassspec-io-py/|crates/openmassspec-io/|python/|Cargo\.toml$|Cargo\.lock$|scripts/fetch-python-parity-fixtures\.py$|\.github/workflows/ci\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No Python binding changes; Python smoke steps are skipped."
+          fi
+
   python:
     name: Python smoke (${{ matrix.os }} / ${{ matrix.python }})
+    needs: python-changes
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -146,11 +182,9 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
-        python: ["3.9", "3.12"]
-        # setup-python has no 3.9 on ubuntu-latest (26.04), so 3.9 runs on 24.04.
-        exclude:
-          - os: ubuntu-latest
-            python: "3.9"
+        python: ["3.12"]
+        # Python 3.9 runs on Ubuntu only. setup-python has no 3.9 on
+        # ubuntu-latest (26.04), so it runs on 24.04.
         include:
           - os: ubuntu-24.04
             python: "3.9"
@@ -162,12 +196,17 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+        if: needs.python-changes.outputs.run == 'true'
       - uses: dtolnay/rust-toolchain@stable
+        if: needs.python-changes.outputs.run == 'true'
       - uses: Swatinem/rust-cache@v2
+        if: needs.python-changes.outputs.run == 'true'
       - uses: actions/setup-python@v7
+        if: needs.python-changes.outputs.run == 'true'
         with:
           python-version: ${{ matrix.python }}
       - name: Create venv
+        if: needs.python-changes.outputs.run == 'true'
         run: |
           python -m venv .venv
           if [ -f .venv/bin/activate ]; then
@@ -178,18 +217,21 @@ jobs:
           fi
           echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
       - name: Install maturin + pytest
+        if: needs.python-changes.outputs.run == 'true'
         run: pip install 'maturin>=1.5,<2' pytest pyarrow numpy
       - name: Build and install openmassspec-io
+        if: needs.python-changes.outputs.run == 'true'
         working-directory: crates/openmassspec-io-py
         # maturin supplies the pyo3 extension-module linker flags for us
         # (incl. the macOS -undefined dynamic_lookup / Windows import-lib
         # handling); no bare `cargo build`/`cargo test` runs in this job.
         run: maturin develop --release --features pyo3/extension-module
       - name: Install openmassspec metapackage
+        if: needs.python-changes.outputs.run == 'true'
         # openmassspec-io was built from this checkout in the prior step.
         run: pip install ./python --no-deps
       - name: Install standalone readers for parity
-        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        if: needs.python-changes.outputs.run == 'true' && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         # Installed from PyPI at the exact versions Cargo.lock resolves, so
         # the native wheels and the readers compiled into openmassspec-io
         # report the same software_version. Needs each locked version on PyPI.
@@ -208,15 +250,19 @@ jobs:
           echo "Installing $pins"
           pip install $pins
       - name: Download fixtures for Python parity
-        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        if: needs.python-changes.outputs.run == 'true' && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: python scripts/fetch-python-parity-fixtures.py
       - name: Import smoke test
+        if: needs.python-changes.outputs.run == 'true'
         run: python -c "import openmassspec_io; print(openmassspec_io.__version__ if hasattr(openmassspec_io, '__version__') else 'ok')"
       - name: Metapackage import smoke
+        if: needs.python-changes.outputs.run == 'true'
         run: python -c "import openmassspec; print(openmassspec.__version__); assert callable(openmassspec.to_mzml)"
       - name: Metapackage tests
+        if: needs.python-changes.outputs.run == 'true'
         run: pytest python/tests -v
       - name: Python binding and parity tests
+        if: needs.python-changes.outputs.run == 'true'
         env:
           OPENMASSSPEC_THERMO_RAW: corpus/thermo/PXD068962_Q_Exactive_UHMR_insource-CID.raw
           OPENMASSSPEC_BRUKER_D: corpus/bruker/NQO1-F107C_coi-N2-P_200-0C_3996.d
