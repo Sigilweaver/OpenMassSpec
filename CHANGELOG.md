@@ -55,8 +55,9 @@ All notable changes to this project will be documented in this file.
   magic bytes, including files made of several gzip members and files with
   trailing zero padding. It read 0 spectra from the compressed bytes and
   reported ok. Truncated or corrupt gzip input fails with the stream error,
-  including a missing or wrong CRC or size trailer and bytes after the last
-  member that are not zero padding.
+  which names what was found: the file ending inside a member (a missing
+  trailer included), a CRC or size mismatch, or bytes after the last member
+  that are not zero padding.
 - `vendor2mzml validate` accepts an mzML file that has no `<spectrumList>`
   (chromatograms only) when it ends with `</mzML>`. A spectrum list with no
   count still fails, and more spectra than the list declares is reported as
