@@ -10,11 +10,11 @@
 
 use std::cell::RefCell;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 use std::rc::Rc;
 
-use flate2::read::MultiGzDecoder;
+use flate2::bufread::GzDecoder;
 use mzdata::prelude::*;
 use mzdata::spectrum::bindata::ArrayRetrievalError;
 use mzdata::spectrum::{IsolationWindowState, RawSpectrum, ScanPolarity};
@@ -54,10 +54,71 @@ fn is_gzip(path: &Path) -> std::io::Result<bool> {
 fn open_stream(path: &Path, gzip: bool) -> std::io::Result<Box<dyn Read>> {
     let file = BufReader::new(File::open(path)?);
     Ok(if gzip {
-        Box::new(MultiGzDecoder::new(file))
+        Box::new(GzipMembers::new(file))
     } else {
         Box::new(file)
     })
+}
+
+/// Reads a gzip file made of one or more concatenated members. Every
+/// member's CRC and size trailer is checked as the member ends. Zero bytes
+/// after the last member are padding and are ignored (as `gzip` does); any
+/// other trailing bytes are an error.
+struct GzipMembers<R: BufRead> {
+    state: MemberState<R>,
+}
+
+enum MemberState<R: BufRead> {
+    Member(GzDecoder<R>),
+    Done,
+}
+
+impl<R: BufRead> GzipMembers<R> {
+    fn new(input: R) -> Self {
+        Self {
+            state: MemberState::Member(GzDecoder::new(input)),
+        }
+    }
+}
+
+impl<R: BufRead> Read for GzipMembers<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        loop {
+            let MemberState::Member(decoder) = &mut self.state else {
+                return Ok(0);
+            };
+            let n = decoder.read(buf)?;
+            if n > 0 || buf.is_empty() {
+                return Ok(n);
+            }
+            // The member ended with its trailer verified. Decide what follows.
+            let MemberState::Member(decoder) =
+                std::mem::replace(&mut self.state, MemberState::Done)
+            else {
+                return Ok(0);
+            };
+            let mut input = decoder.into_inner();
+            let first = input.fill_buf()?.first().copied();
+            match first {
+                None => return Ok(0),
+                Some(0) => loop {
+                    let chunk = input.fill_buf()?;
+                    if chunk.is_empty() {
+                        return Ok(0);
+                    }
+                    if chunk.iter().any(|&b| b != 0) {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "bytes after the gzip stream are not zero padding",
+                        ));
+                    }
+                    let len = chunk.len();
+                    input.consume(len);
+                },
+                Some(_) => self.state = MemberState::Member(GzDecoder::new(input)),
+            }
+        }
+    }
 }
 
 /// Reader that remembers the first I/O error it returned. The mzML reader
@@ -90,12 +151,20 @@ pub fn read_mzml_records(path: &Path) -> openmassspec_io::Result<Vec<SpectrumRec
             first_error: Rc::clone(&first_error),
         };
         let records = read_records(MzMLReader::new(tap), path, true, Some(&first_error));
-        return match (records, first_error.borrow_mut().take()) {
-            (_, Some(e)) => Err(mzml_err(&format!(
+        let stream_error = |e: std::io::Error| {
+            mzml_err(&format!(
                 "gzip stream error: {e}; the file is truncated or corrupt"
-            ))),
-            (records, None) => records,
+            ))
         };
+        if let Some(e) = first_error.borrow_mut().take() {
+            return Err(stream_error(e));
+        }
+        let records = records?;
+        // The mzML reader stops at `</spectrumList>`, so the gzip trailer
+        // (CRC and size) has not been read. Read the stream to its end, which
+        // checks the trailer of every member.
+        std::io::copy(&mut open_stream(path, true)?, &mut std::io::sink()).map_err(stream_error)?;
+        return Ok(records);
     }
     let reader = MzMLReader::open_path(path).map_err(|e| mzml_err(&e))?;
     read_records(reader, path, false, None)

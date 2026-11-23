@@ -602,3 +602,74 @@ fn validate_missing_input_reports_the_io_error() {
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("cannot read"));
 }
+
+fn validate_gz_bytes(name: &str, bytes: &[u8]) -> (Option<i32>, String) {
+    let path = tmp_path(name);
+    std::fs::write(&path, bytes).expect("write gz");
+    let result = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    result
+}
+
+#[test]
+fn validate_gzip_without_its_trailer_fails() {
+    let gz = gzip_bytes(good_mzml_text().as_bytes());
+    let (code, stdout) = validate_gz_bytes("no-trailer.mzML.gz", &gz[..gz.len() - 8]);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_gzip_with_a_wrong_crc_fails() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    let crc_byte = gz.len() - 8;
+    gz[crc_byte] ^= 0xff;
+    let (code, stdout) = validate_gz_bytes("bad-crc.mzML.gz", &gz);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_gzip_with_a_wrong_size_fails() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    let size_byte = gz.len() - 4;
+    gz[size_byte] ^= 0xff;
+    let (code, stdout) = validate_gz_bytes("bad-size.mzML.gz", &gz);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_concatenated_gzip_members_succeed() {
+    let text = good_mzml_text();
+    let cut = text.find("</spectrum>").expect("a spectrum") + "</spectrum>".len();
+    let mut gz = gzip_bytes(&text.as_bytes()[..cut]);
+    gz.extend(gzip_bytes(&text.as_bytes()[cut..]));
+    let (code, stdout) = validate_gz_bytes("members.mzML.gz", &gz);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":3"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_gzip_with_trailing_zero_padding_succeeds() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    gz.extend([0u8; 512]);
+    let (code, stdout) = validate_gz_bytes("padded.mzML.gz", &gz);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":3"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_gzip_followed_by_garbage_fails() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    gz.extend(b"not a gzip member");
+    let (code, stdout) = validate_gz_bytes("garbage-after.mzML.gz", &gz);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
