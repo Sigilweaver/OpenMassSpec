@@ -15,7 +15,10 @@ All notable changes to this project will be documented in this file.
   run in profile mode); scans acquired as centroid are unchanged. Output for
   Thermo profile files grows by about 2x (PXD068962, Q Exactive UHMR: 199,722
   to 1,157,028 points, 16.4 MB to 31.3 MB of mzML), and `--centroid` now
-  keeps 199,687 peaks instead of 66,200.
+  keeps 199,687 peaks instead of 66,200. Python `iter_spectra` and
+  `read_arrow` return the same points, so the `mz` and `intensity` arrays of
+  profile scans are longer in the same way (PXD068962: 199,722 to 1,157,028
+  points, about 5.8 times as many).
 - Thermo `.raw`: every file is now read with the full scan packet
   (`opentfraw` reads the profile data, or the centroid list when the scan has
   none), including files with centroid scans only, whose output is unchanged.
@@ -30,6 +33,23 @@ All notable changes to this project will be documented in this file.
   spectrum is recorded in the spectrum `extra` key
   `opentfraw.unconverted_profile_bins` (present only when it is above 0).
   None of the 3,047 spectra in PXD068962 has any.
+- Thermo `.raw`: `opentfraw` 3.1.0 (3.0.0 before) corrects what is decoded
+  from these files:
+  - Multiplexed Q Exactive and Exploris scan events are read at their own
+    record boundaries, with every precursor. On the public PXD021080 Q
+    Exactive HF and HF-X PRM files, MS2 scans, most of which read as MS1
+    before, now report the right MS order, scan filter and every precursor.
+  - Orbitrap Exploris targeted-MS2 scan events that carry the name of an
+    inclusion-list entry are read at their own record boundaries. No public
+    file with such events is available, so this is covered by unit tests only.
+  - TSQ SRM files in which transitions share a product m/z report the correct
+    `precursor_mz` and scan filter strings for each transition.
+  - Source CID energy is read from the method file as a compound-file stream.
+    Where the method's sectors are not adjacent, `sid=<energy>` and the source
+    CID extra fields were left out and now appear.
+  - A scan-event reaction with a negative or non-finite precursor m/z is a
+    decode error (`InvalidPrecursorMz`) instead of being dropped, so
+    `convert` and `validate` can fail on Thermo files that passed before.
 - `vendor2mzml validate` on an mzML file fails when fewer spectra can be read
   than the `<spectrumList count>` declares (a truncated file, or a spectrum
   that cannot be parsed), and when the file declares no count. These files
@@ -67,14 +87,24 @@ All notable changes to this project will be documented in this file.
 - `vendor2mzml validate` reports an input path that cannot be read (missing,
   permission denied) as that I/O error, as `convert` and `info` do. It said
   the path is not a recognized vendor format or mzML file.
+- `vendor2mzml validate` exit codes change for scripts. A missing path exits 1
+  (a missing path not named `*.mzml` exited 2). An mzML file
+  with more spectra than its list declares, or with no count, exits 1 (it
+  exited 0). A `.mzML.gz` is read and checked like any mzML file, so it can
+  exit 3 on a conformance failure and 1 on a bad gzip stream, where it exited
+  0 with 0 spectra.
 - `vendor2mzml validate` checks the ending of an mzML file that declares 0
   spectra: a file cut off after the empty spectrum list or inside the run
   fails instead of reporting ok.
 
 ### Changed
 
-- Retry CI fixture downloads with exponential backoff and Retry-After support,
-  and report the failing URL when retries are exhausted.
+- Builds on `openmassspec-core` 3.0.0 and the readers `opentfraw` 3.1.0,
+  `opentimstdf` 3.0.1, `openwraw` 4.0.0, `openaraw` 1.0.0, `opensxraw` 0.4.0
+  and `openszraw` 0.3.0. The `opentfraw` floor is 3.1.0, in `Cargo.toml` and
+  in the `thermo` and `all` extras of the `openmassspec` Python package, so a
+  new install gets the reader this release was tested with. `opentimstdf`
+  3.0.1 is a dependency update with no change to decoded data (see Security).
 
 ### Security
 
