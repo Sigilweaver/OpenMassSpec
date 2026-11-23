@@ -1,7 +1,7 @@
 # OpenMassSpec
 
 [![CI](https://github.com/Sigilweaver/OpenMassSpec/actions/workflows/ci.yml/badge.svg)](https://github.com/Sigilweaver/OpenMassSpec/actions/workflows/ci.yml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20470595.svg)](https://doi.org/10.5281/zenodo.20470595)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20470594.svg)](https://doi.org/10.5281/zenodo.20470594)
 [![crates.io](https://img.shields.io/crates/v/openmassspec-io.svg)](https://crates.io/crates/openmassspec-io)
 [![PyPI](https://img.shields.io/pypi/v/openmassspec.svg)](https://pypi.org/project/openmassspec/)
 [![docs.rs](https://img.shields.io/docsrs/openmassspec-io)](https://docs.rs/openmassspec-io)
@@ -53,14 +53,14 @@ The `vendor2mzml` CLI (crate `openmassspec-io-cli`) is not published to
 crates.io; install it from a release tag of this repository:
 
 ```sh
-cargo install --git https://github.com/Sigilweaver/OpenMassSpec --tag v2.0.0 openmassspec-io-cli
+cargo install --git https://github.com/Sigilweaver/OpenMassSpec --tag v2.1.0 openmassspec-io-cli
 ```
 
 The Rust library is on crates.io:
 
 ```toml
 [dependencies]
-openmassspec-io = { version = "2.0", features = ["all"] }
+openmassspec-io = { version = "2.1", features = ["all"] }
 ```
 
 Vendor features are independent (`thermo`, `bruker`, `waters`,
@@ -160,6 +160,13 @@ summary = openmassspec.to_mzml("sample.raw", "sample.mzML", indexed=True)
 with the count, and returns the written and skipped counts; pass
 `skip_unreadable=False` to raise instead. `iter_spectra`, `read_arrow`,
 and `read_chromatograms` always raise on an unreadable record.
+
+## Known issues
+
+- Waters: with `openwraw` 4.0.1, some Encoding D scans fail to decode with
+  `intensity word 0x20000000 has no mantissa`, and a default `vendor2mzml
+  convert` then refuses the file. This is seen on the public PXD053170
+  bundles (282 of 1677 scans in function 1).
 
 ## Documentation
 
