@@ -1,17 +1,18 @@
 //! End-to-end smoke test: detect each vendor format and write a tiny
 //! mzML to a tempfile, asserting it is non-empty and starts with the
-//! mzML preamble. Each branch is skipped silently when the
+//! mzML preamble. Each branch is skipped (with a message) when the
 //! corresponding corpus path is not present so the test stays green on
-//! a vanilla checkout.
+//! a vanilla checkout. With `OPENMASSSPEC_REQUIRE_CORPUS=1` a missing
+//! fixture fails the test instead.
 
 use std::fs;
 use std::path::PathBuf;
 
 /// Returns the first candidate that exists on disk, or the first
 /// candidate (the repo-root `corpus/` location) if none do - so the
-/// existing `!input.exists()` skip-and-log check in `smoke`/
-/// `centroid_smoke`/`stream_matches_collect` still prints a sensible
-/// path when nothing is present.
+/// existing `skip_missing` check in `smoke`/`centroid_smoke`/
+/// `stream_matches_collect` still prints a sensible path when nothing is
+/// present.
 ///
 /// Candidates are always given repo-root-first, sibling-checkout-second:
 /// the repo-root `corpus/` path is the one `.github/workflows/ci.yml`'s
@@ -25,6 +26,22 @@ fn first_existing(candidates: &[PathBuf]) -> PathBuf {
         .find(|p| p.exists())
         .cloned()
         .unwrap_or_else(|| candidates[0].clone())
+}
+
+/// `true` when the fixture is missing and the test should be skipped.
+/// Panics instead when `OPENMASSSPEC_REQUIRE_CORPUS=1`, so a CI job that
+/// downloads the corpus cannot pass with every vendor test skipped.
+fn skip_missing(path: &std::path::Path) -> bool {
+    if path.exists() {
+        return false;
+    }
+    assert!(
+        std::env::var("OPENMASSSPEC_REQUIRE_CORPUS").as_deref() != Ok("1"),
+        "OPENMASSSPEC_REQUIRE_CORPUS=1 but fixture is missing: {}",
+        path.display()
+    );
+    eprintln!("skipping {}: corpus not present", path.display());
+    true
 }
 
 fn manifest_dir() -> PathBuf {
@@ -113,8 +130,7 @@ fn input_tag(input: &std::path::Path) -> String {
 }
 
 fn smoke(input: PathBuf) {
-    if !input.exists() {
-        eprintln!("skipping {}: corpus not present", input.display());
+    if skip_missing(&input) {
         return;
     }
     let det = openmassspec_io::detect_format(&input).expect("detect");
@@ -187,8 +203,7 @@ fn sciex_smoke() {
 /// holds regardless of the input file's actual mode mix, so it's a
 /// meaningful assertion even against real-world corpus data.
 fn centroid_smoke(input: PathBuf) {
-    if !input.exists() {
-        eprintln!("skipping {}: corpus not present", input.display());
+    if skip_missing(&input) {
         return;
     }
     let det = openmassspec_io::detect_format(&input).expect("detect");
@@ -254,8 +269,7 @@ fn sciex_centroid_smoke() {
 /// whole run into a `Vec`, without silently diverging from the existing
 /// two-pass API.
 fn stream_matches_collect(input: PathBuf) {
-    if !input.exists() {
-        eprintln!("skipping {}: corpus not present", input.display());
+    if skip_missing(&input) {
         return;
     }
     let det = openmassspec_io::detect_format(&input).expect("detect");

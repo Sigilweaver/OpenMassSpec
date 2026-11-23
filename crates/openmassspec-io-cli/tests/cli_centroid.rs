@@ -1,10 +1,25 @@
 //! Integration test for `vendor2mzml convert --centroid` / `info --centroid`,
-//! exercised against a real vendor fixture (skipped silently when the
-//! corpus path is not present, matching `openmassspec-io`'s own
-//! `vendor2mzml.rs` test convention).
+//! exercised against a real vendor fixture. A test is skipped (with a
+//! message) when the fixture is absent, unless `OPENMASSSPEC_REQUIRE_CORPUS=1`,
+//! which turns a missing fixture into a failure.
 
 use std::path::PathBuf;
 use std::process::Command;
+
+/// `true` when the fixture is missing and the test should be skipped.
+/// Panics instead when `OPENMASSSPEC_REQUIRE_CORPUS=1`.
+fn skip_missing(path: &std::path::Path) -> bool {
+    if path.exists() {
+        return false;
+    }
+    assert!(
+        std::env::var("OPENMASSSPEC_REQUIRE_CORPUS").as_deref() != Ok("1"),
+        "OPENMASSSPEC_REQUIRE_CORPUS=1 but fixture is missing: {}",
+        path.display()
+    );
+    eprintln!("skipping: corpus not present at {}", path.display());
+    true
+}
 
 fn bin_path() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_vendor2mzml"))
@@ -31,8 +46,7 @@ fn thermo_fixture() -> PathBuf {
 #[test]
 fn convert_centroid_flag_produces_no_profile_spectra() {
     let input = thermo_fixture();
-    if !input.exists() {
-        eprintln!("skipping: corpus not present at {}", input.display());
+    if skip_missing(&input) {
         return;
     }
     let out = std::env::temp_dir().join(format!(
@@ -64,8 +78,7 @@ fn convert_centroid_flag_produces_no_profile_spectra() {
 #[test]
 fn info_centroid_flag_runs_successfully() {
     let input = thermo_fixture();
-    if !input.exists() {
-        eprintln!("skipping: corpus not present at {}", input.display());
+    if skip_missing(&input) {
         return;
     }
 
