@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Thermo `.raw`: profile scans are now exported as profile data. They were
+  read as the reader's centroid peak list and labelled profile, and
+  `--centroid` re-centroided that list. Affects every Thermo file with
+  profile scans (Orbitrap and other profile-mode acquisitions); centroid-only
+  scans are unchanged. Output for Thermo profile files grows by about 2x
+  (PXD068962: 199,722 to 1,157,028 points, 16.4 MB to 31.3 MB of mzML), and
+  `--centroid` now keeps 199,687 peaks instead of 66,200.
+
 ### Changed
 
 - Retry CI fixture downloads with exponential backoff and Retry-After support,

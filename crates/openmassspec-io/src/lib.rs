@@ -298,8 +298,12 @@ fn with_source_inner<T>(
                 let filename = path
                     .file_name()
                     .map_or_else(|| "unknown.raw".into(), |n| n.to_string_lossy());
+                // Profile data is exported (the `include_profile` argument):
+                // the source labels each spectrum with its scan mode, so a
+                // profile scan reads as profile instead of a centroid list
+                // tagged profile.
                 let mut src =
-                    opentfraw::mzml::OpenTfRawSource::new(&raw, &mut file, &filename, false);
+                    opentfraw::mzml::OpenTfRawSource::new(&raw, &mut file, &filename, true);
                 f(&mut src)
             }
             #[cfg(not(feature = "thermo"))]
