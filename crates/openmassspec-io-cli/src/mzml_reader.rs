@@ -234,7 +234,7 @@ fn check_declared_count(
         Some(0) if read == 0 => {
             // An empty list: nothing was read, so only the ending shows that
             // the file was not cut off inside or after the list.
-            let (_, has_end) = scan_markers(open_stream(path, gzip)?)?;
+            let (_, has_end) = scan_file_markers(path, gzip)?;
             if has_end {
                 Ok(())
             } else {
@@ -257,7 +257,7 @@ fn check_declared_count(
              checked for truncation"
         )),
         None => {
-            let (has_list, has_end) = scan_markers(open_stream(path, gzip)?)?;
+            let (has_list, has_end) = scan_file_markers(path, gzip)?;
             if has_list {
                 mzml_err(
                     "the file has a spectrum list with no count, so 0 spectra read cannot be \
@@ -274,6 +274,19 @@ fn check_declared_count(
             }
         }
     }
+}
+
+/// Open `path` again and scan it with `scan_markers`. A gzip stream failure is
+/// worded like the one from the main read.
+fn scan_file_markers(path: &Path, gzip: bool) -> openmassspec_io::Result<(bool, bool)> {
+    let stream = open_stream(path, gzip)?;
+    scan_markers(stream).map_err(|e| {
+        if gzip {
+            gzip_stream_error(&e)
+        } else {
+            e.into()
+        }
+    })
 }
 
 /// Stream through `reader` and report whether it contains a `<spectrumList`
