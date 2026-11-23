@@ -106,6 +106,19 @@ def native_spectra(vendor: str, native, reader, path: Path):
     if vendor in {"agilent", "sciex", "shimadzu"}:
         for record in native.iter_spectra(str(path)):
             yield record.native_id, (lambda f, r=record: getattr(r, f)), record.mz, record.intensity
+    elif vendor == "thermo":
+        # `iter_records` holds the centroid peak list of every scan. The
+        # shared surface exports a profile scan as profile data, which the
+        # standalone reader returns from `profile`; bins the shared surface
+        # drops (m/z that is not positive, or NaN) are dropped here too.
+        for record in reader.iter_records():
+            mz, intensity = record["mz"], record["intensity"]
+            if record["scan_mode"] == "profile":
+                profile_mz, profile_intensity = reader.profile(record["scan_number"])
+                keep = profile_mz > 0
+                if keep.any():
+                    mz, intensity = profile_mz[keep], profile_intensity[keep]
+            yield record["native_id"], record.__getitem__, mz, intensity
     else:
         for record in reader.iter_records():
             yield record["native_id"], record.__getitem__, record["mz"], record["intensity"]
