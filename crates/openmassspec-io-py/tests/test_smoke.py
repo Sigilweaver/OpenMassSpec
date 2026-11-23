@@ -109,6 +109,66 @@ def test_iter_spectra_yields_numpy_arrays(vendor: str):
     del saw_ms2
 
 
+def _first_spectra(path: Path, n: int, read_arrays_first: bool):
+    """Summaries of the first `n` non-empty spectra, reading the peak
+    arrays before or after the derived values."""
+    out = []
+    for spec in opio.iter_spectra(str(path)):
+        if read_arrays_first:
+            n_peaks = len(spec.mz)
+            len(spec.intensity)
+        tic = spec.total_ion_current
+        base_mz = spec.base_peak_mz
+        base_int = spec.base_peak_intensity
+        if not read_arrays_first:
+            n_peaks = len(spec.mz)
+            len(spec.intensity)
+        if n_peaks == 0:
+            continue
+        out.append((spec.index, n_peaks, tic, base_mz, base_int))
+        if len(out) == n:
+            break
+    return out
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_spectrum_getters_are_repeatable(vendor: str):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    n = 0
+    for spec in opio.iter_spectra(str(path)):
+        if len(spec.mz) == 0:
+            continue
+        first_mz = spec.mz.copy()
+        first_int = spec.intensity.copy()
+        # A second read returns the same data, not an empty array.
+        assert len(first_mz) > 0
+        assert np.array_equal(spec.mz, first_mz)
+        assert np.array_equal(spec.intensity, first_int)
+        assert f"n_peaks={len(first_mz)}" in repr(spec)
+        mob_1 = spec.inv_mobility_per_peak
+        mob_2 = spec.inv_mobility_per_peak
+        assert (mob_1 is None) == (mob_2 is None)
+        if mob_1 is not None:
+            assert np.array_equal(mob_1, mob_2)
+        n += 1
+        if n == 20:
+            break
+    assert n > 0
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_derived_values_do_not_depend_on_read_order(vendor: str):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    arrays_first = _first_spectra(path, 20, read_arrays_first=True)
+    arrays_last = _first_spectra(path, 20, read_arrays_first=False)
+    assert arrays_first
+    assert arrays_first == arrays_last
+
+
 @pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
 def test_to_mzml_centroid_removes_profile_spectra(vendor: str, tmp_path: Path):
     path = CORPORA[vendor]

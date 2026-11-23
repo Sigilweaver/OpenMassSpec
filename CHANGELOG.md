@@ -4,6 +4,70 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Thermo `.raw`: profile scans are now exported as profile data. They were
+  read as the reader's centroid peak list and labelled profile, and
+  `--centroid` re-centroided that list. Affects every Thermo `.raw` file with
+  profile-mode scans (for example Q Exactive and other Orbitrap acquisitions
+  run in profile mode); scans acquired as centroid are unchanged. Output for
+  Thermo profile files grows by about 2x (PXD068962, Q Exactive UHMR: 199,722
+  to 1,157,028 points, 16.4 MB to 31.3 MB of mzML), and `--centroid` now
+  keeps 199,687 peaks instead of 66,200.
+- Thermo `.raw`: every file is now read with the full scan packet
+  (`opentfraw` reads the profile data, or the centroid list when the scan has
+  none), including files with centroid scans only, whose output is unchanged.
+  Cost, release build, three runs each: PXD068962 (all profile) converts in
+  about 1.3 s before and after, with peak memory 44 MiB before and 59 MiB
+  after. PXD031322 (Orbitrap Fusion Lumos, 150,020 of 152,328 scans
+  centroid) converts in 46 to 50 s before and 47 to 52 s after, with peak
+  memory 745 MiB before and after; its output grows from 988 MB to 1,121 MB
+  because of its 2,308 profile scans.
+- Thermo `.raw`: profile bins whose m/z cannot be converted (unknown
+  calibration layout, m/z NaN) are dropped, and the number dropped per
+  spectrum is recorded in the spectrum `extra` key
+  `opentfraw.unconverted_profile_bins` (present only when it is above 0).
+  None of the 3,047 spectra in PXD068962 has any.
+- `vendor2mzml validate` on an mzML file fails when fewer spectra can be read
+  than the `<spectrumList count>` declares (a truncated file, or a spectrum
+  that cannot be parsed), and when the file declares no count. These files
+  were reported ok with the spectra that could be read.
+- Python `Spectrum`: `mz`, `intensity` and `inv_mobility_per_peak` return the
+  same array on every access. The second read used to return an empty array,
+  and `total_ion_current`, `base_peak_mz`, `base_peak_intensity` and the
+  `n_peaks` in `repr` depended on which arrays had been read first. They are
+  now computed once, from the full peak list.
+- `openmassspec`: when `openmassspec_io` fails to import, the failure is kept
+  and each reader function (`to_mzml`, `iter_spectra`, `read_chromatograms`,
+  `read_arrow`, `run_info`, `detect_format`, `detect`) raises an
+  `ImportError` chained to it, naming the missing or mismatched module. The
+  functions were set to `None`, so the call failed with `'NoneType' object is
+  not callable` and the cause was lost. A wheel built without Arrow raises the
+  same way from `read_arrow`.
+- `vendor2mzml convert` finishes the gzip stream and syncs the output file
+  explicitly, and reports an error from either step. The gzip trailer and the
+  final buffer flush used to run when the writer was dropped, where an error
+  could not be reported.
+- `vendor2mzml convert` and `info` report an input path that cannot be read
+  (missing, permission denied) as that I/O error. They said the path does not
+  look like a supported vendor format.
+- `vendor2mzml validate` reads gzipped mzML (`.mzML.gz`), recognised by the gzip
+  magic bytes, including files made of several gzip members and files with
+  trailing zero padding. It read 0 spectra from the compressed bytes and
+  reported ok. Truncated or corrupt gzip input fails with the stream error,
+  including a missing or wrong CRC or size trailer and bytes after the last
+  member that are not zero padding.
+- `vendor2mzml validate` accepts an mzML file that has no `<spectrumList>`
+  (chromatograms only) when it ends with `</mzML>`. A spectrum list with no
+  count still fails, and more spectra than the list declares is reported as
+  that, not as truncation.
+- `vendor2mzml validate` reports an input path that cannot be read (missing,
+  permission denied) as that I/O error, as `convert` and `info` do. It said
+  the path is not a recognized vendor format or mzML file.
+- `vendor2mzml validate` checks the ending of an mzML file that declares 0
+  spectra: a file cut off after the empty spectrum list or inside the run
+  fails instead of reporting ok.
+
 ### Changed
 
 - Retry CI fixture downloads with exponential backoff and Retry-After support,

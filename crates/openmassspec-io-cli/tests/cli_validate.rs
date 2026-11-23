@@ -373,3 +373,338 @@ fn base64_encode(data: &[u8]) -> String {
     }
     String::from_utf8(out).unwrap()
 }
+
+fn validate_json(path: &std::path::Path) -> (Option<i32>, String) {
+    let out = Command::new(bin_path())
+        .arg("validate")
+        .arg("--json")
+        .arg(path)
+        .output()
+        .expect("run vendor2mzml");
+    (
+        out.status.code(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+    )
+}
+
+#[test]
+fn validate_truncated_mzml_fails_instead_of_reporting_ok() {
+    let good = tmp_path("trunc-src.mzML");
+    write_good_mzml(&good);
+    let bytes = std::fs::read(&good).expect("read good mzML");
+    let _ = std::fs::remove_file(&good);
+
+    // Cut inside the spectrumList, after the first spectrum has closed.
+    let text = String::from_utf8(bytes).expect("utf-8 mzML");
+    let first_end = text.find("</spectrum>").expect("a spectrum") + "</spectrum>".len();
+    let cut = first_end + (text.len() - first_end) / 3;
+    let path = tmp_path("truncated.mzML");
+    std::fs::write(&path, &text.as_bytes()[..cut]).expect("write truncated mzML");
+
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_ne!(code, Some(0), "truncated file validated: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_mzml_with_corrupt_payload_fails_instead_of_reporting_ok() {
+    let good = tmp_path("corrupt-src.mzML");
+    write_good_mzml(&good);
+    let text = std::fs::read_to_string(&good).expect("read good mzML");
+    let _ = std::fs::remove_file(&good);
+
+    // Damage the second spectrum's m/z payload.
+    let second = text
+        .match_indices("<binary>")
+        .nth(2)
+        .expect("a second payload")
+        .0;
+    let mut damaged = text.clone();
+    damaged.replace_range(second + 8..second + 12, "!!!!");
+    let path = tmp_path("corrupt.mzML");
+    std::fs::write(&path, damaged).expect("write corrupt mzML");
+
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_ne!(code, Some(0), "corrupt file validated: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_mzml_without_spectrum_count_fails_instead_of_reporting_ok() {
+    let good = tmp_path("nocount-src.mzML");
+    write_good_mzml(&good);
+    let text = std::fs::read_to_string(&good).expect("read good mzML");
+    let _ = std::fs::remove_file(&good);
+
+    let at = text
+        .find("<spectrumList count=\"")
+        .expect("spectrumList count");
+    let end = at + text[at..].find('>').expect("end of spectrumList tag");
+    let mut stripped = text.clone();
+    stripped.replace_range(at..end, "<spectrumList");
+    let path = tmp_path("nocount.mzML");
+    std::fs::write(&path, stripped).expect("write mzML without count");
+
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_ne!(code, Some(0), "file without a count validated: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("spectrum list with no count"),
+        "stdout was: {stdout}"
+    );
+}
+
+fn gzip_bytes(data: &[u8]) -> Vec<u8> {
+    use flate2::write::GzEncoder;
+    let mut enc = GzEncoder::new(Vec::new(), flate2::Compression::default());
+    enc.write_all(data).expect("gzip write");
+    enc.finish().expect("gzip finish")
+}
+
+fn good_mzml_text() -> String {
+    let good = tmp_path("text-src.mzML");
+    write_good_mzml(&good);
+    let text = std::fs::read_to_string(&good).expect("read good mzML");
+    let _ = std::fs::remove_file(&good);
+    text
+}
+
+#[test]
+fn validate_gzipped_mzml_reports_every_spectrum() {
+    let path = tmp_path("good.mzML.gz");
+    std::fs::write(&path, gzip_bytes(good_mzml_text().as_bytes())).expect("write gz");
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(stdout.contains("\"ok\":true"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":3"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_truncated_gzip_fails_with_a_stream_error() {
+    let gz = gzip_bytes(good_mzml_text().as_bytes());
+    let path = tmp_path("truncated.mzML.gz");
+    std::fs::write(&path, &gz[..gz.len() * 2 / 3]).expect("write truncated gz");
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
+
+/// A valid mzML with a chromatogram list and no `<spectrumList>`.
+fn chromatogram_only_mzml() -> String {
+    let text = good_mzml_text();
+    let start = text.find("<spectrumList").expect("spectrumList");
+    let end_tag = "</spectrumList>";
+    let end = text.find(end_tag).expect("end of spectrumList") + end_tag.len();
+    let mut out = text.clone();
+    out.replace_range(
+        start..end,
+        concat!(
+            r#"<chromatogramList count="1" defaultDataProcessingRef="dp1">"#,
+            r#"<chromatogram index="0" id="TIC" defaultArrayLength="0">"#,
+            r#"<cvParam cvRef="MS" accession="MS:1000235" name="total ion current chromatogram"/>"#,
+            r#"</chromatogram></chromatogramList>"#
+        ),
+    );
+    out
+}
+
+#[test]
+fn validate_chromatogram_only_mzml_succeeds() {
+    let path = tmp_path("chrom-only.mzML");
+    std::fs::write(&path, chromatogram_only_mzml()).expect("write mzML");
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(stdout.contains("\"ok\":true"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":0"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_truncated_chromatogram_only_mzml_fails() {
+    let text = chromatogram_only_mzml();
+    let cut = text.find("<chromatogramList").expect("chromatogramList");
+    let path = tmp_path("chrom-only-truncated.mzML");
+    std::fs::write(&path, &text.as_bytes()[..cut]).expect("write mzML");
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("ends before </mzML>"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_empty_spectrum_list_without_count_fails() {
+    let text = good_mzml_text();
+    let start = text.find("<spectrumList").expect("spectrumList");
+    let end_tag = "</spectrumList>";
+    let end = text.find(end_tag).expect("end of spectrumList") + end_tag.len();
+    let mut stripped = text.clone();
+    stripped.replace_range(start..end, "<spectrumList></spectrumList>");
+    let path = tmp_path("empty-list.mzML");
+    std::fs::write(&path, stripped).expect("write mzML");
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("spectrum list with no count"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_more_spectra_than_declared_says_so() {
+    let text = good_mzml_text();
+    let at = text.find("<spectrumList count=\"3\"").expect("count 3");
+    let mut changed = text.clone();
+    changed.replace_range(
+        at..at + "<spectrumList count=\"3\"".len(),
+        "<spectrumList count=\"2\"",
+    );
+    let path = tmp_path("overfull.mzML");
+    std::fs::write(&path, changed).expect("write mzML");
+    let (code, stdout) = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("read 3 spectra but the file declares only 2"),
+        "stdout was: {stdout}"
+    );
+    assert!(!stdout.contains("truncated"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_missing_input_reports_the_io_error() {
+    let path = tmp_path("absent.mzML");
+    let (code, stdout) = validate_json(&path);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+    assert!(stdout.contains("cannot read"), "stdout was: {stdout}");
+    let out = Command::new(bin_path())
+        .arg("validate")
+        .arg(&path)
+        .output()
+        .expect("run vendor2mzml");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("cannot read"));
+}
+
+fn validate_gz_bytes(name: &str, bytes: &[u8]) -> (Option<i32>, String) {
+    let path = tmp_path(name);
+    std::fs::write(&path, bytes).expect("write gz");
+    let result = validate_json(&path);
+    let _ = std::fs::remove_file(&path);
+    result
+}
+
+#[test]
+fn validate_gzip_without_its_trailer_fails() {
+    let gz = gzip_bytes(good_mzml_text().as_bytes());
+    let (code, stdout) = validate_gz_bytes("no-trailer.mzML.gz", &gz[..gz.len() - 8]);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_gzip_with_a_wrong_crc_fails() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    let crc_byte = gz.len() - 8;
+    gz[crc_byte] ^= 0xff;
+    let (code, stdout) = validate_gz_bytes("bad-crc.mzML.gz", &gz);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_gzip_with_a_wrong_size_fails() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    let size_byte = gz.len() - 4;
+    gz[size_byte] ^= 0xff;
+    let (code, stdout) = validate_gz_bytes("bad-size.mzML.gz", &gz);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}
+
+#[test]
+fn validate_concatenated_gzip_members_succeed() {
+    let text = good_mzml_text();
+    let cut = text.find("</spectrum>").expect("a spectrum") + "</spectrum>".len();
+    let mut gz = gzip_bytes(&text.as_bytes()[..cut]);
+    gz.extend(gzip_bytes(&text.as_bytes()[cut..]));
+    let (code, stdout) = validate_gz_bytes("members.mzML.gz", &gz);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":3"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_gzip_with_trailing_zero_padding_succeeds() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    gz.extend([0u8; 512]);
+    let (code, stdout) = validate_gz_bytes("padded.mzML.gz", &gz);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":3"),
+        "stdout was: {stdout}"
+    );
+}
+
+fn empty_run_mzml() -> String {
+    let mut src = VecSource::new(make_metadata(), Vec::new());
+    let mut out = Vec::new();
+    write_mzml(&mut src, &mut out).expect("write mzml");
+    String::from_utf8(out).expect("utf-8 mzML")
+}
+
+#[test]
+fn validate_empty_run_succeeds_and_a_cut_one_fails() {
+    let text = empty_run_mzml();
+    assert!(text.contains("<spectrumList count=\"0\""), "{text}");
+    let path = tmp_path("empty-run.mzML");
+    std::fs::write(&path, &text).expect("write mzML");
+    let (code, stdout) = validate_json(&path);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":0"),
+        "stdout was: {stdout}"
+    );
+
+    // Cut right after the spectrumList start tag, and later inside the run.
+    let list = text.find("<spectrumList count=\"0\"").expect("list");
+    let end = text.find("</mzML>").expect("end");
+    for (label, cut) in [("after-list-tag", list + 10), ("before-end", end - 1)] {
+        std::fs::write(&path, &text.as_bytes()[..cut]).expect("write cut mzML");
+        let (code, stdout) = validate_json(&path);
+        assert_eq!(code, Some(1), "{label}: stdout was: {stdout}");
+        assert!(
+            stdout.contains("ends before </mzML>"),
+            "{label}: stdout was: {stdout}"
+        );
+    }
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn validate_gzip_followed_by_garbage_fails() {
+    let mut gz = gzip_bytes(good_mzml_text().as_bytes());
+    gz.extend(b"not a gzip member");
+    let (code, stdout) = validate_gz_bytes("garbage-after.mzML.gz", &gz);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+}

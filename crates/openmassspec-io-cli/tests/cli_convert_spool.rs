@@ -7,7 +7,8 @@
 //! converts a fixture whose spectra exceed 64 MiB with `TMPDIR` pointing at
 //! a directory that does not exist: the conversion only succeeds if the
 //! spool goes next to the output. Skipped when the corpus fixture is not
-//! present, matching the other corpus-backed CLI tests.
+//! present (a failure under `OPENMASSSPEC_REQUIRE_CORPUS=1`), matching the
+//! other corpus-backed CLI tests.
 
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
@@ -50,6 +51,11 @@ fn spectrum_list(path: &Path) -> (usize, Vec<usize>) {
 fn convert_spools_next_to_the_output_not_in_tmpdir() {
     let input = bruker_fixture();
     if !input.exists() {
+        assert!(
+            std::env::var("OPENMASSSPEC_REQUIRE_CORPUS").as_deref() != Ok("1"),
+            "OPENMASSSPEC_REQUIRE_CORPUS=1 but fixture is missing: {}",
+            input.display()
+        );
         eprintln!("skipping: corpus not present at {}", input.display());
         return;
     }

@@ -14,7 +14,9 @@ A path is treated as Thermo when:
 ## Covered features
 
 - Multi-controller files (MS, PDA, UV, analog).
-- Centroided and profile spectra.
+- Centroided and profile spectra. A profile scan is exported as profile
+  data (about twice the mzML size of a centroid list), and `--centroid`
+  picks peaks from it.
 - Scan-trailer fields: scan filter line, master scan, precursor m/z,
   isolation width, collision energy, polarity, MS level, analyzer.
 - Indexed mzML output with native-id format `Thermo nativeID format`.

@@ -114,7 +114,39 @@ fn cv_term_to_dict<'py>(py: Python<'py>, term: &CvTerm) -> PyResult<Bound<'py, P
 /// One decoded spectrum, exposed to Python with NumPy-backed peak arrays.
 #[pyclass(module = "openmassspec_io._openmassspec_io")]
 pub struct Spectrum {
-    rec: Option<SpectrumRecord>,
+    rec: SpectrumRecord,
+    /// Values derived from the peak arrays, taken before the arrays move
+    /// into NumPy.
+    derived: Derived,
+    /// NumPy arrays, built on first access and handed out again on every
+    /// later one.
+    mz: Option<Py<PyArray1<f64>>>,
+    intensity: Option<Py<PyArray1<f32>>>,
+    inv_mobility_per_peak: Option<Option<Py<PyArray1<f32>>>>,
+}
+
+/// Peak-array summaries computed once from the record.
+struct Derived {
+    n_peaks: usize,
+    total_ion_current: f64,
+    base_peak: Option<(f64, f64)>,
+}
+
+impl Spectrum {
+    fn new(rec: SpectrumRecord) -> Self {
+        let derived = Derived {
+            n_peaks: rec.mz.len(),
+            total_ion_current: rec.effective_tic(),
+            base_peak: rec.effective_base_peak(),
+        };
+        Spectrum {
+            rec,
+            derived,
+            mz: None,
+            intensity: None,
+            inv_mobility_per_peak: None,
+        }
+    }
 }
 
 #[pymethods]
@@ -145,7 +177,7 @@ impl Spectrum {
     }
     #[getter]
     fn total_ion_current(&self) -> PyResult<f64> {
-        self.rec_ref().map(|r| r.effective_tic())
+        Ok(self.derived.total_ion_current)
     }
     #[getter]
     fn reported_total_ion_current(&self) -> PyResult<Option<f64>> {
@@ -153,7 +185,7 @@ impl Spectrum {
     }
     #[getter]
     fn base_peak_mz(&self) -> PyResult<Option<f64>> {
-        self.rec_ref().map(|r| r.effective_base_peak().map(|t| t.0))
+        Ok(self.derived.base_peak.map(|t| t.0))
     }
     #[getter]
     fn reported_base_peak_mz(&self) -> PyResult<Option<f64>> {
@@ -161,7 +193,7 @@ impl Spectrum {
     }
     #[getter]
     fn base_peak_intensity(&self) -> PyResult<Option<f64>> {
-        self.rec_ref().map(|r| r.effective_base_peak().map(|t| t.1))
+        Ok(self.derived.base_peak.map(|t| t.1))
     }
     #[getter]
     fn reported_base_peak_intensity(&self) -> PyResult<Option<f64>> {
@@ -209,32 +241,42 @@ impl Spectrum {
         self.rec_ref().map(|r| r.extra.clone())
     }
 
-    /// Zero-copy NumPy view over the m/z array (owned by NumPy after this
-    /// access; the spectrum no longer holds the peaks).
+    /// NumPy array over the m/z values. The first access moves the values
+    /// into NumPy without copying; later accesses return the same array.
     #[getter]
-    fn mz<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
-        let rec = self.rec.as_mut().ok_or_else(consumed_err)?;
-        let v = std::mem::take(&mut rec.mz);
-        Ok(PyArray1::from_vec(py, v))
+    fn mz<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        let rec = &mut self.rec;
+        self.mz
+            .get_or_insert_with(|| PyArray1::from_vec(py, std::mem::take(&mut rec.mz)).unbind())
+            .bind(py)
+            .clone()
     }
 
+    /// NumPy array over the intensities (same caching as `mz`).
     #[getter]
-    fn intensity<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f32>>> {
-        let rec = self.rec.as_mut().ok_or_else(consumed_err)?;
-        let v = std::mem::take(&mut rec.intensity);
-        Ok(PyArray1::from_vec(py, v))
+    fn intensity<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<f32>> {
+        let rec = &mut self.rec;
+        self.intensity
+            .get_or_insert_with(|| {
+                PyArray1::from_vec(py, std::mem::take(&mut rec.intensity)).unbind()
+            })
+            .bind(py)
+            .clone()
     }
 
+    /// NumPy array of per-peak inverse mobility, or `None` when the
+    /// spectrum has none (same caching as `mz`).
     #[getter]
-    fn inv_mobility_per_peak<'py>(
-        &mut self,
-        py: Python<'py>,
-    ) -> PyResult<Option<Bound<'py, PyArray1<f32>>>> {
-        let rec = self.rec.as_mut().ok_or_else(consumed_err)?;
-        Ok(rec
-            .inv_mobility_per_peak
-            .take()
-            .map(|v| PyArray1::from_vec(py, v)))
+    fn inv_mobility_per_peak<'py>(&mut self, py: Python<'py>) -> Option<Bound<'py, PyArray1<f32>>> {
+        let rec = &mut self.rec;
+        self.inv_mobility_per_peak
+            .get_or_insert_with(|| {
+                rec.inv_mobility_per_peak
+                    .take()
+                    .map(|v| PyArray1::from_vec(py, v).unbind())
+            })
+            .as_ref()
+            .map(|a| a.bind(py).clone())
     }
 
     /// Precursor metadata for MS2+ spectra, as a `dict`, or `None`.
@@ -251,23 +293,15 @@ impl Spectrum {
         let r = self.rec_ref()?;
         Ok(format!(
             "<Spectrum index={} ms_level={} native_id={:?} rt_sec={:.3} n_peaks={}>",
-            r.index,
-            r.ms_level,
-            r.native_id,
-            r.retention_time_sec,
-            r.mz.len()
+            r.index, r.ms_level, r.native_id, r.retention_time_sec, self.derived.n_peaks
         ))
     }
 }
 
 impl Spectrum {
     fn rec_ref(&self) -> PyResult<&SpectrumRecord> {
-        self.rec.as_ref().ok_or_else(consumed_err)
+        Ok(&self.rec)
     }
-}
-
-fn consumed_err() -> PyErr {
-    PyRuntimeError::new_err("spectrum peak arrays have already been consumed")
 }
 
 fn precursor_to_dict<'py>(py: Python<'py>, p: &PrecursorInfo) -> PyResult<Bound<'py, PyDict>> {
@@ -499,7 +533,7 @@ impl SpectrumIter {
         }
         let rx = &slf.rx;
         match py.detach(|| rx.lock().expect("iter mutex poisoned").recv()) {
-            Ok(StreamMsg::Record(rec)) => Ok(Some(Spectrum { rec: Some(*rec) })),
+            Ok(StreamMsg::Record(rec)) => Ok(Some(Spectrum::new(*rec))),
             Ok(StreamMsg::Done(Ok(()))) => {
                 slf.finished = true;
                 Ok(None)

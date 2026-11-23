@@ -106,6 +106,19 @@ def native_spectra(vendor: str, native, reader, path: Path):
     if vendor in {"agilent", "sciex", "shimadzu"}:
         for record in native.iter_spectra(str(path)):
             yield record.native_id, (lambda f, r=record: getattr(r, f)), record.mz, record.intensity
+    elif vendor == "thermo":
+        # `iter_records` holds the centroid peak list of every scan. The
+        # shared surface exports a profile scan as profile data, which the
+        # standalone reader returns from `profile`; bins the shared surface
+        # drops (m/z that is not positive, or NaN) are dropped here too.
+        for record in reader.iter_records():
+            mz, intensity = record["mz"], record["intensity"]
+            if record["scan_mode"] == "profile":
+                profile_mz, profile_intensity = reader.profile(record["scan_number"])
+                keep = profile_mz > 0
+                assert keep.any(), (record["native_id"], "profile read has no usable bins")
+                mz, intensity = profile_mz[keep], profile_intensity[keep]
+            yield record["native_id"], record.__getitem__, mz, intensity
     else:
         for record in reader.iter_records():
             yield record["native_id"], record.__getitem__, record["mz"], record["intensity"]
@@ -170,6 +183,37 @@ def test_native_record_parity(vendor: str):
         np.testing.assert_array_equal(
             shared_chrom.intensity, np.asarray(native_chrom["intensity"], dtype=np.float32)
         )
+
+
+def test_thermo_arrays_match_standalone_for_every_scan():
+    """Peak arrays of every scan in the run match the standalone
+    reader: a profile scan against its profile read (bins with a
+    non-positive or NaN m/z dropped), any other scan against its peaks."""
+    path = corpus_path("thermo")
+    try:
+        native = importlib.import_module("opentfraw")
+    except ImportError:
+        skip_or_fail("opentfraw is not installed")
+    reader = native.RawFile(str(path))
+    checked = profile_checked = 0
+    for position, shared in enumerate(opio.iter_spectra(str(path))):
+        if shared.scan_mode == "profile":
+            native_mz, native_intensity = reader.profile(shared.scan_number)
+            keep = native_mz > 0
+            assert keep.any(), (position, shared.native_id, "profile read has no usable bins")
+            native_mz, native_intensity = native_mz[keep], native_intensity[keep]
+            profile_checked += 1
+        else:
+            native_mz, native_intensity = reader.peaks(shared.scan_number)
+        np.testing.assert_array_equal(shared.mz, native_mz, err_msg=shared.native_id)
+        np.testing.assert_array_equal(
+            shared.intensity,
+            np.asarray(native_intensity, dtype=np.float32),
+            err_msg=shared.native_id,
+        )
+        checked += 1
+    assert checked == reader.num_scans, (checked, reader.num_scans)
+    assert profile_checked > 0, "no profile scan was compared"
 
 
 @pytest.mark.parametrize("vendor", VENDORS)

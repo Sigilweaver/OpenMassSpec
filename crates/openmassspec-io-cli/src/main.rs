@@ -78,7 +78,7 @@ struct ConvertArgs {
 #[derive(Args, Debug)]
 struct ValidateArgs {
     /// Input path: a vendor acquisition (`.raw` / `.d/` / `.raw/`) or
-    /// an mzML file (`.mzml` or `.mzml.gz`).
+    /// an mzML file (`.mzml` or `.mzml.gz`; gzip is recognised by content).
     input: PathBuf,
     /// Emit the result as a single JSON object on stdout.
     #[arg(long)]
@@ -128,7 +128,30 @@ fn main() -> ExitCode {
 // convert
 // ---------------------------------------------------------------------
 
+/// The message for an input that cannot be stat-ed (missing, permission
+/// denied, I/O error), so it is not mistaken for an unsupported format.
+fn input_read_error(input: &Path) -> Option<String> {
+    match std::fs::metadata(input) {
+        Ok(_) => None,
+        Err(e) => Some(format!("cannot read {}: {e}", input.display())),
+    }
+}
+
+/// Print an unreadable input as that error and return the exit code.
+fn check_input_readable(input: &Path) -> Result<(), ExitCode> {
+    match input_read_error(input) {
+        None => Ok(()),
+        Some(msg) => {
+            eprintln!("error: {msg}");
+            Err(ExitCode::from(1))
+        }
+    }
+}
+
 fn run_convert(args: ConvertArgs) -> ExitCode {
+    if let Err(code) = check_input_readable(&args.input) {
+        return code;
+    }
     let Some(detected) = detect_format(&args.input) else {
         eprintln!(
             "error: {} does not look like a supported vendor format",
@@ -181,8 +204,9 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    if let Err(e) = writer.flush() {
-        eprintln!("error: flush: {e}");
+    if let Err(e) = writer.finish() {
+        eprintln!("error: finishing {}: {e}", args.output.display());
+        eprintln!("  {} is incomplete", args.output.display());
         return ExitCode::from(1);
     }
     warn_skipped(&summary);
@@ -205,7 +229,49 @@ fn spool_dir_for(output: &Path) -> PathBuf {
     }
 }
 
-fn open_writer(path: &Path) -> std::io::Result<Box<dyn Write>> {
+/// Output sink that keeps its concrete type, so the gzip trailer and the
+/// final buffer flush can be finished with their errors reported (both are
+/// ignored when these types are merely dropped).
+enum OutWriter {
+    Plain(BufWriter<File>),
+    Gz(GzEncoder<BufWriter<File>>),
+}
+
+impl Write for OutWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(w) => w.write(buf),
+            Self::Gz(w) => w.write(buf),
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Plain(w) => w.flush(),
+            Self::Gz(w) => w.flush(),
+        }
+    }
+}
+
+impl OutWriter {
+    /// Write the gzip trailer (if any), flush, and sync a regular file to disk.
+    fn finish(self) -> std::io::Result<()> {
+        let buf = match self {
+            Self::Plain(w) => w,
+            Self::Gz(w) => w.finish()?,
+        };
+        let file = buf
+            .into_inner()
+            .map_err(std::io::IntoInnerError::into_error)?;
+        // Pipes and character devices (`/dev/stdout`) cannot be synced;
+        // only a regular file is.
+        if file.metadata()?.is_file() {
+            file.sync_all()?;
+        }
+        Ok(())
+    }
+}
+
+fn open_writer(path: &Path) -> std::io::Result<OutWriter> {
     let f = File::create(path)?;
     let buf = BufWriter::with_capacity(2 << 20, f);
     let is_gz = path
@@ -213,9 +279,9 @@ fn open_writer(path: &Path) -> std::io::Result<Box<dyn Write>> {
         .and_then(|n| n.to_str())
         .is_some_and(|n| n.ends_with(".gz"));
     if is_gz {
-        Ok(Box::new(GzEncoder::new(buf, Compression::default())))
+        Ok(OutWriter::Gz(GzEncoder::new(buf, Compression::default())))
     } else {
-        Ok(Box::new(buf))
+        Ok(OutWriter::Plain(buf))
     }
 }
 
@@ -287,6 +353,9 @@ fn report(
 // ---------------------------------------------------------------------
 
 fn run_info(args: InfoArgs) -> ExitCode {
+    if let Err(code) = check_input_readable(&args.input) {
+        return code;
+    }
     let Some(detected) = detect_format(&args.input) else {
         eprintln!(
             "error: {} does not look like a supported vendor format",
@@ -465,6 +534,11 @@ fn summarize(
 
 fn run_validate(args: ValidateArgs) -> ExitCode {
     let t_start = Instant::now();
+
+    if let Some(msg) = input_read_error(&args.input) {
+        emit_validate_result(args.json, &args.input, "error", 0, Err(&msg), 0.0);
+        return ExitCode::from(1);
+    }
 
     // 1) Vendor input wins if detect_format recognizes it.
     let records_res: Result<(Vec<SpectrumRecord>, &'static str), String> =
