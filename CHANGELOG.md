@@ -37,6 +37,13 @@ All notable changes to this project will be documented in this file.
 - `vendor2mzml convert` and `info` report an input path that cannot be read
   (missing, permission denied) as that I/O error. They said the path does not
   look like a supported vendor format.
+- `vendor2mzml validate` reads gzipped mzML (`.mzML.gz`), recognised by the gzip
+  magic bytes. It read 0 spectra from the compressed bytes and reported ok.
+  A truncated or corrupt gzip stream fails with the stream error.
+- `vendor2mzml validate` accepts an mzML file that has no `<spectrumList>`
+  (chromatograms only) when it ends with `</mzML>`. A spectrum list with no
+  count still fails, and more spectra than the list declares is reported as
+  that, not as truncation.
 
 ### Changed
 
