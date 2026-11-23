@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use openmassspec_core::{write_mzml, CvTerm, Polarity, PrecursorInfo, RunMetadata, SpectrumRecord};
 use openmassspec_io::VecSource;
@@ -78,14 +79,19 @@ fn write_good_mzml(path: &std::path::Path) {
     w.flush().expect("flush");
 }
 
+/// A path no other call in this process, or in another one, returns. The
+/// counter keeps the tests that run in parallel threads apart on platforms
+/// whose clock is too coarse to tell two calls apart.
 fn tmp_path(name: &str) -> PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
     let mut p = std::env::temp_dir();
     let pid = std::process::id();
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    p.push(format!("vendor2mzml-validate-{pid}-{nanos}-{name}"));
+    let n = NEXT.fetch_add(1, Ordering::Relaxed);
+    p.push(format!("vendor2mzml-validate-{pid}-{nanos}-{n}-{name}"));
     p
 }
 
