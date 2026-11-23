@@ -748,3 +748,22 @@ fn validate_gzipped_empty_run_reports_stream_errors_as_gzip_errors() {
         "stdout was: {stdout}"
     );
 }
+
+#[test]
+fn validate_gzipped_conformance_failure_exits_three() {
+    let gz = gzip_bytes(bad_mzml_with_array_length_mismatch().as_bytes());
+    let (code, stdout) = validate_gz_bytes("bad.mzML.gz", &gz);
+    assert_eq!(code, Some(3), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("PeakArrayLengthMismatch"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn validate_missing_input_not_named_mzml_exits_one() {
+    let path = tmp_path("absent.bin");
+    let (code, stdout) = validate_json(&path);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("cannot read"), "stdout was: {stdout}");
+}
