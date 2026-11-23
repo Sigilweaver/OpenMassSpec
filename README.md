@@ -161,6 +161,13 @@ with the count, and returns the written and skipped counts; pass
 `skip_unreadable=False` to raise instead. `iter_spectra`, `read_arrow`,
 and `read_chromatograms` always raise on an unreadable record.
 
+## Known issues
+
+- Waters: with `openwraw` 4.0.1, some Encoding D scans fail to decode with
+  `intensity word 0x20000000 has no mantissa`, and a default `vendor2mzml
+  convert` then refuses the file. This is seen on the public PXD053170
+  bundles (282 of 1677 scans in function 1).
+
 ## Documentation
 
 Full reference, conversion semantics, and the per-vendor parser notes
