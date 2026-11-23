@@ -30,6 +30,10 @@ All notable changes to this project will be documented in this file.
   functions were set to `None`, so the call failed with `'NoneType' object is
   not callable` and the cause was lost. A wheel built without Arrow raises the
   same way from `read_arrow`.
+- `vendor2mzml convert` finishes the gzip trailer, flushes and syncs the
+  output file, and reports an error from any of those steps. They ran when the
+  writer was dropped, with errors ignored, so a failure at the end of a `.gz`
+  output could leave a truncated file and exit 0.
 
 ### Changed
 
