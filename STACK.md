@@ -11,7 +11,7 @@ Regenerate with `scripts/release-stack.sh --write-stack-md --apply`.
 | openmassspec-core | 3.0.0 | `21c66d7` |
 | opentfraw | 3.1.0 | `890f8bd` |
 | opentimstdf | 3.0.1 | `ba93855` |
-| openwraw | 4.0.0 | `665a662` |
+| openwraw | 4.0.1 | `4db6b51` |
 | openaraw | 1.0.0 | `e22d3e5` |
 | opensxraw | 0.4.0 | `d31e92a` |
 | openszraw | 0.3.0 | `f8ddba3` |
