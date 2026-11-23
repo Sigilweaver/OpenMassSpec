@@ -64,6 +64,9 @@ All notable changes to this project will be documented in this file.
 - `vendor2mzml validate` reports an input path that cannot be read (missing,
   permission denied) as that I/O error, as `convert` and `info` do. It said
   the path is not a recognized vendor format or mzML file.
+- `vendor2mzml validate` checks the ending of an mzML file that declares 0
+  spectra: a file cut off after the empty spectrum list or inside the run
+  fails instead of reporting ok.
 
 ### Changed
 

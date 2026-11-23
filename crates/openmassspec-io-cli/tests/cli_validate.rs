@@ -665,6 +665,41 @@ fn validate_gzip_with_trailing_zero_padding_succeeds() {
     );
 }
 
+fn empty_run_mzml() -> String {
+    let mut src = VecSource::new(make_metadata(), Vec::new());
+    let mut out = Vec::new();
+    write_mzml(&mut src, &mut out).expect("write mzml");
+    String::from_utf8(out).expect("utf-8 mzML")
+}
+
+#[test]
+fn validate_empty_run_succeeds_and_a_cut_one_fails() {
+    let text = empty_run_mzml();
+    assert!(text.contains("<spectrumList count=\"0\""), "{text}");
+    let path = tmp_path("empty-run.mzML");
+    std::fs::write(&path, &text).expect("write mzML");
+    let (code, stdout) = validate_json(&path);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("\"spectrum_count\":0"),
+        "stdout was: {stdout}"
+    );
+
+    // Cut right after the spectrumList start tag, and later inside the run.
+    let list = text.find("<spectrumList count=\"0\"").expect("list");
+    let end = text.find("</mzML>").expect("end");
+    for (label, cut) in [("after-list-tag", list + 10), ("before-end", end - 1)] {
+        std::fs::write(&path, &text.as_bytes()[..cut]).expect("write cut mzML");
+        let (code, stdout) = validate_json(&path);
+        assert_eq!(code, Some(1), "{label}: stdout was: {stdout}");
+        assert!(
+            stdout.contains("ends before </mzML>"),
+            "{label}: stdout was: {stdout}"
+        );
+    }
+    let _ = std::fs::remove_file(&path);
+}
+
 #[test]
 fn validate_gzip_followed_by_garbage_fails() {
     let mut gz = gzip_bytes(good_mzml_text().as_bytes());

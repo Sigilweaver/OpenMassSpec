@@ -205,6 +205,19 @@ fn check_declared_count(
 ) -> openmassspec_io::Result<()> {
     let mzml_err = |msg: String| Err(openmassspec_io::Error::Mzml(msg));
     match declared {
+        Some(0) if read == 0 => {
+            // An empty list: nothing was read, so only the ending shows that
+            // the file was not cut off inside or after the list.
+            let (_, has_end) = scan_markers(open_stream(path, gzip)?)?;
+            if has_end {
+                Ok(())
+            } else {
+                mzml_err(
+                    "the file declares 0 spectra and ends before </mzML>; it is truncated"
+                        .to_string(),
+                )
+            }
+        }
         Some(n) if n == read as u64 => Ok(()),
         Some(n) if (read as u64) > n => mzml_err(format!(
             "read {read} spectra but the file declares only {n}"
