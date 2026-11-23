@@ -50,6 +50,18 @@ All notable changes to this project will be documented in this file.
   - A scan-event reaction with a negative or non-finite precursor m/z is a
     decode error (`InvalidPrecursorMz`) instead of being dropped, so
     `convert` and `validate` can fail on Thermo files that passed before.
+- Waters Encoding D intensities are decoded with the correct float layout
+  (`openwraw` 4.0.1). The 4-byte intensity word was read as 16.16 fixed
+  point, which gives roughly the logarithm of the intensity, so every peak and
+  the noise floor landed between about 80 and 1000. The word is the compressed
+  float that Encoding E uses (21-bit mantissa, 5-bit exponent,
+  `mantissa * 2^(exponent - 21)`), and a word the format cannot produce is a
+  parse error. Every Encoding D function is affected: SYNAPT G2, G2-S, G2-Si
+  and XS, Vion, Xevo G2-XS and G3, and the non-lock-mass functions of mixed
+  bundles. Intensities, TIC and base peak change in mzML output and in the
+  Python API; m/z values and point counts are unchanged. Evidence: public
+  PXD058812 `ITEM_M11_7_His_tag_01.raw`, scan 0, base peak 30594 at m/z 650.997
+  (989.88 before), TIC 894,725 (4,056,044 before).
 - `vendor2mzml validate` on an mzML file fails when fewer spectra can be read
   than the `<spectrumList count>` declares (a truncated file, or a spectrum
   that cannot be parsed), and when the file declares no count. These files
@@ -100,10 +112,11 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Builds on `openmassspec-core` 3.0.0 and the readers `opentfraw` 3.1.0,
-  `opentimstdf` 3.0.1, `openwraw` 4.0.0, `openaraw` 1.0.0, `opensxraw` 0.4.0
-  and `openszraw` 0.3.0. The `opentfraw` floor is 3.1.0, in `Cargo.toml` and
-  in the `thermo` and `all` extras of the `openmassspec` Python package, so a
-  new install gets the reader this release was tested with. `opentimstdf`
+  `opentimstdf` 3.0.1, `openwraw` 4.0.1, `openaraw` 1.0.0, `opensxraw` 0.4.0
+  and `openszraw` 0.3.0. The `opentfraw` floor is 3.1.0 and the `openwraw`
+  floor is 4.0.1, in `Cargo.toml` and in the `thermo`, `waters` and `all`
+  extras of the `openmassspec` Python package, so a new install gets the
+  readers this release was tested with. `opentimstdf`
   3.0.1 is a dependency update with no change to decoded data (see Security).
 
 ### Security
