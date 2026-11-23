@@ -14,6 +14,20 @@ All notable changes to this project will be documented in this file.
   Thermo profile files grows by about 2x (PXD068962, Q Exactive UHMR: 199,722
   to 1,157,028 points, 16.4 MB to 31.3 MB of mzML), and `--centroid` now
   keeps 199,687 peaks instead of 66,200.
+- Thermo `.raw`: every file is now read with the full scan packet
+  (`opentfraw` reads the profile data, or the centroid list when the scan has
+  none), including files with centroid scans only, whose output is unchanged.
+  Cost, release build, three runs each: PXD068962 (all profile) converts in
+  about 1.3 s before and after, with peak memory 44 MiB before and 59 MiB
+  after. PXD031322 (Orbitrap Fusion Lumos, 150,020 of 152,328 scans
+  centroid) converts in 46 to 50 s before and 47 to 52 s after, with peak
+  memory 745 MiB before and after; its output grows from 988 MB to 1,121 MB
+  because of its 2,308 profile scans.
+- Thermo `.raw`: profile bins whose m/z cannot be converted (unknown
+  calibration layout, m/z NaN) are dropped, and the number dropped per
+  spectrum is recorded in the spectrum `extra` key
+  `opentfraw.unconverted_profile_bins` (present only when it is above 0).
+  None of the 3,047 spectra in PXD068962 has any.
 - `vendor2mzml validate` on an mzML file fails when fewer spectra can be read
   than the `<spectrumList count>` declares (a truncated file, or a spectrum
   that cannot be parsed), and when the file declares no count. These files
@@ -30,10 +44,10 @@ All notable changes to this project will be documented in this file.
   functions were set to `None`, so the call failed with `'NoneType' object is
   not callable` and the cause was lost. A wheel built without Arrow raises the
   same way from `read_arrow`.
-- `vendor2mzml convert` finishes the gzip trailer, flushes and syncs the
-  output file, and reports an error from any of those steps. They ran when the
-  writer was dropped, with errors ignored, so a failure at the end of a `.gz`
-  output could leave a truncated file and exit 0.
+- `vendor2mzml convert` finishes the gzip stream and syncs the output file
+  explicitly, and reports an error from either step. The gzip trailer and the
+  final buffer flush used to run when the writer was dropped, where an error
+  could not be reported.
 - `vendor2mzml convert` and `info` report an input path that cannot be read
   (missing, permission denied) as that I/O error. They said the path does not
   look like a supported vendor format.
