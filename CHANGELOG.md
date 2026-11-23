@@ -8,16 +8,21 @@ All notable changes to this project will be documented in this file.
 
 - Thermo `.raw`: profile scans are now exported as profile data. They were
   read as the reader's centroid peak list and labelled profile, and
-  `--centroid` re-centroided that list. Affects every Thermo file with
-  profile scans (Orbitrap and other profile-mode acquisitions); centroid-only
-  scans are unchanged. Output for Thermo profile files grows by about 2x
-  (PXD068962: 199,722 to 1,157,028 points, 16.4 MB to 31.3 MB of mzML), and
-  `--centroid` now keeps 199,687 peaks instead of 66,200.
-
+  `--centroid` re-centroided that list. Affects every Thermo `.raw` file with
+  profile-mode scans (for example Q Exactive and other Orbitrap acquisitions
+  run in profile mode); scans acquired as centroid are unchanged. Output for
+  Thermo profile files grows by about 2x (PXD068962, Q Exactive UHMR: 199,722
+  to 1,157,028 points, 16.4 MB to 31.3 MB of mzML), and `--centroid` now
+  keeps 199,687 peaks instead of 66,200.
 - `vendor2mzml validate` on an mzML file fails when fewer spectra can be read
   than the `<spectrumList count>` declares (a truncated file, or a spectrum
   that cannot be parsed), and when the file declares no count. These files
   were reported ok with the spectra that could be read.
+- Python `Spectrum`: `mz`, `intensity` and `inv_mobility_per_peak` return the
+  same array on every access. The second read used to return an empty array,
+  and `total_ion_current`, `base_peak_mz`, `base_peak_intensity` and the
+  `n_peaks` in `repr` depended on which arrays had been read first. They are
+  now computed once, from the full peak list.
 
 ### Changed
 
