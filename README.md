@@ -1,7 +1,7 @@
 # OpenMassSpec
 
 [![CI](https://github.com/Sigilweaver/OpenMassSpec/actions/workflows/ci.yml/badge.svg)](https://github.com/Sigilweaver/OpenMassSpec/actions/workflows/ci.yml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20470595.svg)](https://doi.org/10.5281/zenodo.20470595)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20470594.svg)](https://doi.org/10.5281/zenodo.20470594)
 [![crates.io](https://img.shields.io/crates/v/openmassspec-io.svg)](https://crates.io/crates/openmassspec-io)
 [![PyPI](https://img.shields.io/pypi/v/openmassspec.svg)](https://pypi.org/project/openmassspec/)
 [![docs.rs](https://img.shields.io/docsrs/openmassspec-io)](https://docs.rs/openmassspec-io)
