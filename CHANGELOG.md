@@ -61,7 +61,9 @@ All notable changes to this project will be documented in this file.
   bundles. Intensities, TIC and base peak change in mzML output and in the
   Python API; m/z values and point counts are unchanged. Evidence: public
   PXD058812 `ITEM_M11_7_His_tag_01.raw`, scan 0, base peak 30594 at m/z 650.997
-  (989.88 before), TIC 894,725 (4,056,044 before).
+  (989.88 before), TIC 894,725 (4,056,044 before). Some scans in some files
+  hit that parse error, so `convert` and `validate` can fail on Waters files
+  that passed before; see Known issues in the README.
 - `vendor2mzml validate` on an mzML file fails when fewer spectra can be read
   than the `<spectrumList count>` declares (a truncated file, or a spectrum
   that cannot be parsed), and when the file declares no count. These files
