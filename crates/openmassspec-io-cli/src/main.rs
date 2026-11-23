@@ -128,7 +128,22 @@ fn main() -> ExitCode {
 // convert
 // ---------------------------------------------------------------------
 
+/// Report an input that cannot be stat-ed (missing, permission denied, I/O
+/// error) as that error, so it is not mistaken for an unsupported format.
+fn check_input_readable(input: &Path) -> Result<(), ExitCode> {
+    match std::fs::metadata(input) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!("error: cannot read {}: {e}", input.display());
+            Err(ExitCode::from(1))
+        }
+    }
+}
+
 fn run_convert(args: ConvertArgs) -> ExitCode {
+    if let Err(code) = check_input_readable(&args.input) {
+        return code;
+    }
     let Some(detected) = detect_format(&args.input) else {
         eprintln!(
             "error: {} does not look like a supported vendor format",
@@ -330,6 +345,9 @@ fn report(
 // ---------------------------------------------------------------------
 
 fn run_info(args: InfoArgs) -> ExitCode {
+    if let Err(code) = check_input_readable(&args.input) {
+        return code;
+    }
     let Some(detected) = detect_format(&args.input) else {
         eprintln!(
             "error: {} does not look like a supported vendor format",

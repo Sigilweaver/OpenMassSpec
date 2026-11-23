@@ -34,6 +34,9 @@ All notable changes to this project will be documented in this file.
   output file, and reports an error from any of those steps. They ran when the
   writer was dropped, with errors ignored, so a failure at the end of a `.gz`
   output could leave a truncated file and exit 0.
+- `vendor2mzml convert` and `info` report an input path that cannot be read
+  (missing, permission denied) as that I/O error. They said the path does not
+  look like a supported vendor format.
 
 ### Changed
 

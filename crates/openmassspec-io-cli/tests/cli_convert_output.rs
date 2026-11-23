@@ -1,6 +1,7 @@
-//! Integration tests for the output file of `vendor2mzml convert`: a gzip
-//! output is a complete gzip stream, and a failed write is an error. A test
-//! is skipped (with a message) when the corpus fixture is absent, unless
+//! Integration tests for what `vendor2mzml convert` and `info` do with
+//! their paths: a gzip output is a complete gzip stream, a failed write is
+//! an error, and an unreadable input is reported as such. The Thermo tests
+//! are skipped when the corpus fixture is absent, unless
 //! `OPENMASSSPEC_REQUIRE_CORPUS=1`, which turns a missing fixture into a
 //! failure.
 
@@ -91,4 +92,55 @@ fn convert_to_a_full_device_is_an_error() {
         );
     }
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn assert_io_error(o: &Output, what: &str) {
+    let stderr = String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(1), "{what}: {stderr}");
+    assert!(stderr.contains("cannot read"), "{what}: {stderr}");
+    assert!(
+        !stderr.contains("does not look like a supported vendor format"),
+        "{what}: {stderr}"
+    );
+}
+
+#[test]
+fn missing_input_is_reported_as_an_io_error() {
+    let dir = scratch_dir("missing");
+    let input = dir.join("absent.raw");
+    let out = dir.join("out.mzML");
+    assert_io_error(
+        &run(&["convert".as_ref(), input.as_os_str(), out.as_os_str()]),
+        "convert",
+    );
+    assert_io_error(&run(&["info".as_ref(), input.as_os_str()]), "info");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[cfg(unix)]
+#[test]
+fn unreadable_input_is_reported_as_an_io_error() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = scratch_dir("denied");
+    let locked = dir.join("locked");
+    std::fs::create_dir(&locked).expect("create locked dir");
+    let input = locked.join("sample.raw");
+    std::fs::write(&input, b"x").expect("write input");
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000))
+        .expect("lock directory");
+    // Root (or a filesystem ignoring modes) can still stat the file.
+    let can_stat = std::fs::metadata(&input).is_ok();
+    let out = dir.join("out.mzML");
+    let convert = run(&["convert".as_ref(), input.as_os_str(), out.as_os_str()]);
+    let info = run(&["info".as_ref(), input.as_os_str()]);
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755))
+        .expect("unlock directory");
+    let _ = std::fs::remove_dir_all(&dir);
+    if can_stat {
+        eprintln!("skipping: directory permissions are not enforced here");
+        return;
+    }
+    assert_io_error(&convert, "convert");
+    assert_io_error(&info, "info");
 }
