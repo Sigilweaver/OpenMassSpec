@@ -115,7 +115,16 @@ impl<R: BufRead> Read for GzipMembers<R> {
                     let len = chunk.len();
                     input.consume(len);
                 },
-                Some(_) => self.state = MemberState::Member(GzDecoder::new(input)),
+                Some(b) if b == GZIP_MAGIC[0] => {
+                    self.state = MemberState::Member(GzDecoder::new(input));
+                }
+                Some(_) => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "bytes after the gzip stream are neither another gzip member nor zero \
+                         padding",
+                    ));
+                }
             }
         }
     }
@@ -140,30 +149,47 @@ impl<R: Read> Read for ErrorTap<R> {
     }
 }
 
+/// Hands the same underlying stream to the mzML reader and, once that reader
+/// is done, back to the caller to read to the end.
+struct SharedStream(Rc<RefCell<Box<dyn Read>>>);
+
+impl Read for SharedStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.0.borrow_mut().read(buf)
+    }
+}
+
+/// Words a gzip stream failure by what was found.
+fn gzip_stream_error(e: &std::io::Error) -> openmassspec_io::Error {
+    let found = if e.kind() == std::io::ErrorKind::UnexpectedEof {
+        "the file ends inside a gzip member".to_string()
+    } else {
+        e.to_string()
+    };
+    openmassspec_io::Error::Mzml(format!("gzip stream error: {found}"))
+}
+
 /// Decode an mzML (or mzML.gz) file into a vector of `SpectrumRecord`s.
 /// Gzip is recognised by its magic bytes.
 pub fn read_mzml_records(path: &Path) -> openmassspec_io::Result<Vec<SpectrumRecord>> {
     let mzml_err = |e: &dyn std::fmt::Display| openmassspec_io::Error::Mzml(e.to_string());
     if is_gzip(path)? {
         let first_error = Rc::new(RefCell::new(None));
+        let stream = Rc::new(RefCell::new(open_stream(path, true)?));
         let tap = ErrorTap {
-            inner: open_stream(path, true)?,
+            inner: SharedStream(Rc::clone(&stream)),
             first_error: Rc::clone(&first_error),
         };
         let records = read_records(MzMLReader::new(tap), path, true, Some(&first_error));
-        let stream_error = |e: std::io::Error| {
-            mzml_err(&format!(
-                "gzip stream error: {e}; the file is truncated or corrupt"
-            ))
-        };
         if let Some(e) = first_error.borrow_mut().take() {
-            return Err(stream_error(e));
+            return Err(gzip_stream_error(&e));
         }
         let records = records?;
         // The mzML reader stops at `</spectrumList>`, so the gzip trailer
-        // (CRC and size) has not been read. Read the stream to its end, which
-        // checks the trailer of every member.
-        std::io::copy(&mut open_stream(path, true)?, &mut std::io::sink()).map_err(stream_error)?;
+        // (CRC and size) has not been read. Read the rest of the same stream,
+        // which checks the trailer of every member.
+        std::io::copy(&mut SharedStream(stream), &mut std::io::sink())
+            .map_err(|e| gzip_stream_error(&e))?;
         return Ok(records);
     }
     let reader = MzMLReader::open_path(path).map_err(|e| mzml_err(&e))?;
@@ -208,7 +234,7 @@ fn check_declared_count(
         Some(0) if read == 0 => {
             // An empty list: nothing was read, so only the ending shows that
             // the file was not cut off inside or after the list.
-            let (_, has_end) = scan_markers(open_stream(path, gzip)?)?;
+            let (_, has_end) = scan_file_markers(path, gzip)?;
             if has_end {
                 Ok(())
             } else {
@@ -231,7 +257,7 @@ fn check_declared_count(
              checked for truncation"
         )),
         None => {
-            let (has_list, has_end) = scan_markers(open_stream(path, gzip)?)?;
+            let (has_list, has_end) = scan_file_markers(path, gzip)?;
             if has_list {
                 mzml_err(
                     "the file has a spectrum list with no count, so 0 spectra read cannot be \
@@ -248,6 +274,19 @@ fn check_declared_count(
             }
         }
     }
+}
+
+/// Open `path` again and scan it with `scan_markers`. A gzip stream failure is
+/// worded like the one from the main read.
+fn scan_file_markers(path: &Path, gzip: bool) -> openmassspec_io::Result<(bool, bool)> {
+    let stream = open_stream(path, gzip)?;
+    scan_markers(stream).map_err(|e| {
+        if gzip {
+            gzip_stream_error(&e)
+        } else {
+            e.into()
+        }
+    })
 }
 
 /// Stream through `reader` and report whether it contains a `<spectrumList`
@@ -349,4 +388,273 @@ fn spectrum_to_record(
             .with_precursor(precursor)
             .with_peaks(mz, intensity),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Cursor, ErrorKind, Write};
+
+    use flate2::write::DeflateEncoder;
+    use flate2::{Compression, Crc};
+
+    use super::*;
+
+    /// Input buffer sizes the reader is driven with. 1 splits every header
+    /// field and every padding block across reads.
+    const CAPACITIES: [usize; 6] = [1, 2, 3, 7, 64, 8192];
+
+    /// Optional gzip header fields (RFC 1952, section 2.3.1).
+    #[derive(Default, Clone)]
+    struct Header {
+        extra: Option<&'static [u8]>,
+        name: Option<&'static str>,
+        comment: Option<&'static str>,
+        header_crc: bool,
+    }
+
+    /// One gzip member holding `data`, with the header fields in `h`.
+    fn member(data: &[u8], h: &Header) -> Vec<u8> {
+        let mut flags = 0u8;
+        let mut out = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255];
+        if let Some(extra) = h.extra {
+            flags |= 0x04;
+            out.extend((extra.len() as u16).to_le_bytes());
+            out.extend(extra);
+        }
+        if let Some(name) = h.name {
+            flags |= 0x08;
+            out.extend(name.as_bytes());
+            out.push(0);
+        }
+        if let Some(comment) = h.comment {
+            flags |= 0x10;
+            out.extend(comment.as_bytes());
+            out.push(0);
+        }
+        if h.header_crc {
+            flags |= 0x02;
+        }
+        out[3] = flags;
+        if h.header_crc {
+            let mut crc = Crc::new();
+            crc.update(&out);
+            out.extend((crc.sum() as u16).to_le_bytes());
+        }
+        let mut enc = DeflateEncoder::new(Vec::new(), Compression::default());
+        enc.write_all(data).expect("deflate write");
+        out.extend(enc.finish().expect("deflate finish"));
+        let mut crc = Crc::new();
+        crc.update(data);
+        out.extend(crc.sum().to_le_bytes());
+        out.extend((data.len() as u32).to_le_bytes());
+        out
+    }
+
+    fn plain(data: &[u8]) -> Vec<u8> {
+        member(data, &Header::default())
+    }
+
+    fn read_all(bytes: &[u8], capacity: usize) -> std::io::Result<Vec<u8>> {
+        let input = BufReader::with_capacity(capacity, Cursor::new(bytes.to_vec()));
+        let mut out = Vec::new();
+        GzipMembers::new(input).read_to_end(&mut out)?;
+        Ok(out)
+    }
+
+    fn assert_reads(bytes: &[u8], expected: &[u8]) {
+        for capacity in CAPACITIES {
+            let got = read_all(bytes, capacity)
+                .unwrap_or_else(|e| panic!("capacity {capacity}: unexpected error: {e}"));
+            assert_eq!(got, expected, "capacity {capacity}");
+        }
+    }
+
+    fn assert_fails(bytes: &[u8], kind: ErrorKind) -> Vec<String> {
+        CAPACITIES
+            .iter()
+            .map(|&capacity| {
+                let e = read_all(bytes, capacity)
+                    .expect_err(&format!("capacity {capacity}: expected an error"));
+                assert_eq!(e.kind(), kind, "capacity {capacity}: {e}");
+                e.to_string()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn one_member_with_a_header_split_across_reads() {
+        assert_reads(&plain(b"hello gzip"), b"hello gzip");
+    }
+
+    #[test]
+    fn empty_member_in_the_middle_and_at_the_end() {
+        let mut gz = plain(b"abc");
+        gz.extend(plain(b""));
+        assert_reads(&gz, b"abc");
+        gz.extend(plain(b"def"));
+        assert_reads(&gz, b"abcdef");
+        gz.extend(plain(b""));
+        assert_reads(&gz, b"abcdef");
+        assert_reads(&plain(b""), b"");
+        let mut empties = plain(b"");
+        empties.extend(plain(b""));
+        assert_reads(&empties, b"");
+    }
+
+    #[test]
+    fn header_fields_are_skipped() {
+        let fields = [
+            Header {
+                extra: Some(b"XYabcdef"),
+                ..Header::default()
+            },
+            Header {
+                name: Some("run1.mzML"),
+                ..Header::default()
+            },
+            Header {
+                comment: Some("a comment"),
+                ..Header::default()
+            },
+            Header {
+                header_crc: true,
+                ..Header::default()
+            },
+            Header {
+                extra: Some(b"AB\x00\x02\x01\x02"),
+                name: Some("run1.mzML"),
+                comment: Some("a comment"),
+                header_crc: true,
+            },
+        ];
+        for h in &fields {
+            assert_reads(&member(b"payload", h), b"payload");
+            // The same member after another one, so the header is parsed
+            // from the middle of the stream.
+            let mut gz = plain(b"first ");
+            gz.extend(member(b"second", h));
+            assert_reads(&gz, b"first second");
+        }
+    }
+
+    #[test]
+    fn a_wrong_header_crc_is_an_error() {
+        let mut gz = member(
+            b"payload",
+            &Header {
+                header_crc: true,
+                ..Header::default()
+            },
+        );
+        gz[10] ^= 0xff;
+        for capacity in CAPACITIES {
+            assert!(read_all(&gz, capacity).is_err(), "capacity {capacity}");
+        }
+    }
+
+    #[test]
+    fn zero_padding_of_any_length_is_ignored() {
+        for padding in [1usize, 2, 3, 5, 511, 512, 513, 10_000] {
+            let mut gz = plain(b"abc");
+            gz.extend(vec![0u8; padding]);
+            assert_reads(&gz, b"abc");
+        }
+    }
+
+    #[test]
+    fn zero_padding_after_an_empty_member_is_ignored() {
+        let mut gz = plain(b"abc");
+        gz.extend(plain(b""));
+        gz.extend([0u8; 9]);
+        assert_reads(&gz, b"abc");
+    }
+
+    #[test]
+    fn a_partial_padding_block_is_ignored() {
+        // 4 zero bytes is less than the 512-byte block `tar` pads to, and
+        // more than one read at capacity 1, 2 and 3.
+        let mut gz = plain(b"abc");
+        gz.extend([0u8; 4]);
+        assert_reads(&gz, b"abc");
+    }
+
+    #[test]
+    fn non_zero_bytes_after_padding_are_an_error() {
+        for padding in [1usize, 4, 511, 600] {
+            let mut gz = plain(b"abc");
+            gz.extend(vec![0u8; padding]);
+            gz.push(1);
+            for msg in assert_fails(&gz, ErrorKind::InvalidData) {
+                assert!(msg.contains("not zero padding"), "padding {padding}: {msg}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_member_after_padding_is_an_error() {
+        let mut gz = plain(b"abc");
+        gz.extend([0u8; 4]);
+        gz.extend(plain(b"def"));
+        assert_fails(&gz, ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn trailing_bytes_that_are_not_a_gzip_member_are_an_error() {
+        // Shorter and longer than the 10-byte fixed gzip header.
+        for garbage in [&b"x"[..], b"not gzip", b"this is not a gzip member at all"] {
+            let mut gz = plain(b"abc");
+            gz.extend(garbage);
+            for msg in assert_fails(&gz, ErrorKind::InvalidData) {
+                assert!(msg.contains("neither another gzip member"), "{msg}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_truncated_second_member_is_an_unexpected_eof() {
+        let mut gz = plain(b"abc");
+        let second = plain(b"def");
+        gz.extend(&second[..5]);
+        assert_fails(&gz, ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn a_missing_trailer_is_an_unexpected_eof() {
+        let gz = plain(b"abc");
+        assert_fails(&gz[..gz.len() - 8], ErrorKind::UnexpectedEof);
+        assert_fails(&gz[..gz.len() - 1], ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn a_wrong_crc_is_an_error_that_says_so() {
+        let mut gz = plain(b"abc");
+        let crc_byte = gz.len() - 8;
+        gz[crc_byte] ^= 0xff;
+        for msg in assert_fails(&gz, ErrorKind::InvalidInput) {
+            assert!(msg.contains("checksum"), "{msg}");
+        }
+    }
+
+    #[test]
+    fn stream_errors_say_what_was_found() {
+        let eof = gzip_stream_error(&std::io::Error::from(ErrorKind::UnexpectedEof)).to_string();
+        assert!(eof.contains("gzip stream error"), "{eof}");
+        assert!(eof.contains("ends inside a gzip member"), "{eof}");
+
+        let crc = gzip_stream_error(&std::io::Error::new(
+            ErrorKind::InvalidInput,
+            "corrupt gzip stream does not have a matching checksum",
+        ))
+        .to_string();
+        assert!(crc.contains("matching checksum"), "{crc}");
+        assert!(!crc.contains("truncated"), "{crc}");
+
+        let padding = gzip_stream_error(&std::io::Error::new(
+            ErrorKind::InvalidData,
+            "bytes after the gzip stream are not zero padding",
+        ))
+        .to_string();
+        assert!(padding.contains("not zero padding"), "{padding}");
+        assert!(!padding.contains("truncated"), "{padding}");
+    }
 }

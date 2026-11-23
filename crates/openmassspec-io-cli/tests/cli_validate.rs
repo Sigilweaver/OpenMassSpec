@@ -708,3 +708,37 @@ fn validate_gzip_followed_by_garbage_fails() {
     assert_eq!(code, Some(1), "stdout was: {stdout}");
     assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
 }
+
+#[test]
+fn validate_gzipped_empty_run_reports_stream_errors_as_gzip_errors() {
+    let gz = gzip_bytes(empty_run_mzml().as_bytes());
+
+    let (code, stdout) = validate_gz_bytes("empty-run.mzML.gz", &gz);
+    assert_eq!(code, Some(0), "stdout was: {stdout}");
+
+    let mut bad_crc = gz.clone();
+    let crc_byte = bad_crc.len() - 8;
+    bad_crc[crc_byte] ^= 0xff;
+    let (code, stdout) = validate_gz_bytes("empty-run-crc.mzML.gz", &bad_crc);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+    assert!(stdout.contains("checksum"), "stdout was: {stdout}");
+
+    let (code, stdout) = validate_gz_bytes("empty-run-cut.mzML.gz", &gz[..gz.len() - 3]);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("ends inside a gzip member"),
+        "stdout was: {stdout}"
+    );
+
+    let mut garbage = gz;
+    garbage.extend(b"not a gzip member");
+    let (code, stdout) = validate_gz_bytes("empty-run-garbage.mzML.gz", &garbage);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("gzip stream error"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("neither another gzip member"),
+        "stdout was: {stdout}"
+    );
+}
