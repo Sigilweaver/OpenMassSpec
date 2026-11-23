@@ -78,7 +78,7 @@ struct ConvertArgs {
 #[derive(Args, Debug)]
 struct ValidateArgs {
     /// Input path: a vendor acquisition (`.raw` / `.d/` / `.raw/`) or
-    /// an mzML file (`.mzml` or `.mzml.gz`).
+    /// an mzML file (`.mzml` or `.mzml.gz`; gzip is recognised by content).
     input: PathBuf,
     /// Emit the result as a single JSON object on stdout.
     #[arg(long)]
@@ -128,13 +128,21 @@ fn main() -> ExitCode {
 // convert
 // ---------------------------------------------------------------------
 
-/// Report an input that cannot be stat-ed (missing, permission denied, I/O
-/// error) as that error, so it is not mistaken for an unsupported format.
-fn check_input_readable(input: &Path) -> Result<(), ExitCode> {
+/// The message for an input that cannot be stat-ed (missing, permission
+/// denied, I/O error), so it is not mistaken for an unsupported format.
+fn input_read_error(input: &Path) -> Option<String> {
     match std::fs::metadata(input) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            eprintln!("error: cannot read {}: {e}", input.display());
+        Ok(_) => None,
+        Err(e) => Some(format!("cannot read {}: {e}", input.display())),
+    }
+}
+
+/// Print an unreadable input as that error and return the exit code.
+fn check_input_readable(input: &Path) -> Result<(), ExitCode> {
+    match input_read_error(input) {
+        None => Ok(()),
+        Some(msg) => {
+            eprintln!("error: {msg}");
             Err(ExitCode::from(1))
         }
     }
@@ -526,6 +534,11 @@ fn summarize(
 
 fn run_validate(args: ValidateArgs) -> ExitCode {
     let t_start = Instant::now();
+
+    if let Some(msg) = input_read_error(&args.input) {
+        emit_validate_result(args.json, &args.input, "error", 0, Err(&msg), 0.0);
+        return ExitCode::from(1);
+    }
 
     // 1) Vendor input wins if detect_format recognizes it.
     let records_res: Result<(Vec<SpectrumRecord>, &'static str), String> =

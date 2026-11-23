@@ -44,6 +44,9 @@ All notable changes to this project will be documented in this file.
   (chromatograms only) when it ends with `</mzML>`. A spectrum list with no
   count still fails, and more spectra than the list declares is reported as
   that, not as truncation.
+- `vendor2mzml validate` reports an input path that cannot be read (missing,
+  permission denied) as that I/O error, as `convert` and `info` do. It said
+  the path is not a recognized vendor format or mzML file.
 
 ### Changed
 

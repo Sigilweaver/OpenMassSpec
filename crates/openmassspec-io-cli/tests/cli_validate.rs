@@ -586,3 +586,19 @@ fn validate_more_spectra_than_declared_says_so() {
     );
     assert!(!stdout.contains("truncated"), "stdout was: {stdout}");
 }
+
+#[test]
+fn validate_missing_input_reports_the_io_error() {
+    let path = tmp_path("absent.mzML");
+    let (code, stdout) = validate_json(&path);
+    assert_eq!(code, Some(1), "stdout was: {stdout}");
+    assert!(stdout.contains("\"ok\":false"), "stdout was: {stdout}");
+    assert!(stdout.contains("cannot read"), "stdout was: {stdout}");
+    let out = Command::new(bin_path())
+        .arg("validate")
+        .arg(&path)
+        .output()
+        .expect("run vendor2mzml");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("cannot read"));
+}
