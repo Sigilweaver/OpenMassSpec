@@ -14,6 +14,11 @@ All notable changes to this project will be documented in this file.
   (PXD068962: 199,722 to 1,157,028 points, 16.4 MB to 31.3 MB of mzML), and
   `--centroid` now keeps 199,687 peaks instead of 66,200.
 
+- `vendor2mzml validate` on an mzML file fails when fewer spectra can be read
+  than the `<spectrumList count>` declares (a truncated file, or a spectrum
+  that cannot be parsed), and when the file declares no count. These files
+  were reported ok with the spectra that could be read.
+
 ### Changed
 
 - Retry CI fixture downloads with exponential backoff and Retry-After support,
