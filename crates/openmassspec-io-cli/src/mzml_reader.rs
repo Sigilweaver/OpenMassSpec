@@ -70,12 +70,11 @@ struct ErrorTap<R> {
 
 impl<R: Read> Read for ErrorTap<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.inner.read(buf).map_err(|e| {
+        self.inner.read(buf).inspect_err(|e| {
             let mut slot = self.first_error.borrow_mut();
             if slot.is_none() && e.kind() != std::io::ErrorKind::Interrupted {
                 *slot = Some(std::io::Error::new(e.kind(), e.to_string()));
             }
-            e
         })
     }
 }
