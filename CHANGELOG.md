@@ -23,6 +23,13 @@ All notable changes to this project will be documented in this file.
   and `total_ion_current`, `base_peak_mz`, `base_peak_intensity` and the
   `n_peaks` in `repr` depended on which arrays had been read first. They are
   now computed once, from the full peak list.
+- `openmassspec`: when `openmassspec_io` fails to import, the failure is kept
+  and each reader function (`to_mzml`, `iter_spectra`, `read_chromatograms`,
+  `read_arrow`, `run_info`, `detect_format`, `detect`) raises an
+  `ImportError` chained to it, naming the missing or mismatched module. The
+  functions were set to `None`, so the call failed with `'NoneType' object is
+  not callable` and the cause was lost. A wheel built without Arrow raises the
+  same way from `read_arrow`.
 
 ### Changed
 

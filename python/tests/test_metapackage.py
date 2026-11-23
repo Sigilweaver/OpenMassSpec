@@ -10,6 +10,8 @@ These tests do not require any vendor corpus. They exercise:
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import openmassspec
@@ -161,13 +163,43 @@ def test_open_run_unknown_raises(tmp_path: Path):
 def test_openmassspec_io_reexports_present():
     # The base install pulls openmassspec_io; the re-exports should be
     # importable callables. If openmassspec_io is genuinely missing the
-    # module falls back to None and we skip.
-    if openmassspec.to_mzml is None:
+    # module keeps raising stubs and we skip.
+    if openmassspec._IO_IMPORT_ERROR is not None:
         pytest.skip("openmassspec_io not importable in this environment")
     assert callable(openmassspec.to_mzml)
     assert callable(openmassspec.iter_spectra)
     assert callable(openmassspec.detect_format)
     assert openmassspec.RunInfo is not None
+
+
+def test_failed_openmassspec_io_import_is_kept_and_chained():
+    # With openmassspec_io unimportable, `import openmassspec` still works
+    # and each reader entry point raises the original import failure.
+    code = (
+        "import sys\n"
+        "sys.modules['openmassspec_io'] = None\n"
+        "import openmassspec\n"
+        "assert openmassspec.__version__\n"
+        "assert openmassspec._IO_IMPORT_ERROR is not None\n"
+        "for name in ('to_mzml', 'iter_spectra', 'read_chromatograms', 'read_arrow',\n"
+        "             'run_info', 'detect_format'):\n"
+        "    try:\n"
+        "        getattr(openmassspec, name)('x')\n"
+        "    except ImportError as e:\n"
+        "        assert name in str(e), e\n"
+        "        assert 'openmassspec_io' in str(e), e\n"
+        "        assert e.__cause__ is openmassspec._IO_IMPORT_ERROR, name\n"
+        "    else:\n"
+        "        raise SystemExit(name + ' did not raise')\n"
+        "try:\n"
+        "    openmassspec.detect('x')\n"
+        "except ImportError as e:\n"
+        "    assert e.__cause__ is openmassspec._IO_IMPORT_ERROR\n"
+        "else:\n"
+        "    raise SystemExit('detect did not raise')\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_version_matches_installed_metadata():
