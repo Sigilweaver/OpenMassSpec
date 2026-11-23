@@ -19,7 +19,7 @@ documentation = "https://sigilweaver.app/openmassspec/docs/"
 [workspace.dependencies]
 openmassspec-core = "3.0.0"
 openmassspec-arrow = "3.0.0"
-opentfraw = "3.0.0"
+opentfraw = "3.1.0"
 opentimstdf = "3.0.1"
 openwraw = "4.0.0"
 openaraw = "1.0.0"
