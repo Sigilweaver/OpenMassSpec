@@ -37,11 +37,11 @@ dependencies = ["openmassspec-io>=2.0.0,<3"]
 # per-vendor package for direct use.
 thermo = ["opentfraw>=3.1.0,<4"]
 bruker = ["opentimstdf>=3.0.1,<4"]
-waters = ["openwraw>=4.0.0,<5"]
+waters = ["openwraw>=4.0.1,<5"]
 agilent = ["openaraw>=1.0.0,<2"]
 sciex = ["opensxraw>=0.4.0,<0.5"]
 shimadzu = ["openszraw>=0.3.0,<0.4"]
-all = ["opentfraw>=3.1.0,<4", "opentimstdf>=3.0.1,<4", "openwraw>=4.0.0,<5", "openaraw>=1.0.0,<2", "opensxraw>=0.4.0,<0.5", "openszraw>=0.3.0,<0.4"]
+all = ["opentfraw>=3.1.0,<4", "opentimstdf>=3.0.1,<4", "openwraw>=4.0.1,<5", "openaraw>=1.0.0,<2", "opensxraw>=0.4.0,<0.5", "openszraw>=0.3.0,<0.4"]
 
 [project.urls]
 Homepage = "https://github.com/Sigilweaver/OpenMassSpec"
