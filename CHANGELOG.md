@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-11-26
+
+### Fixed
+
+- Waters: Encoding D scans that contain the intensity word `0x20000000` are
+  decoded (`openwraw` 4.0.2, Sigilweaver/OpenWRaw#70), so `vendor2mzml
+  convert`, `validate`, the Python API and `read_arrow` no longer refuse such
+  files. With `openwraw` 4.0.1 (OpenMassSpec 2.1.0) these scans failed with
+  `intensity word 0x20000000 has no mantissa`. The word is flag bit 29 with no
+  mantissa; it now becomes a kept point with intensity 0.0. The public
+  PXD053170 bundles `20231113_NSE_Sample_High.raw` (302 of 1677 function 1
+  scans) and `20231113_NSE_Sample_NDS.raw` (282 of 1677) contain it, and no
+  other bundle in the public corpus does. Other mantissa-zero words are still
+  parse errors. Across 81 bundles (253,279 scans) the 584 scans above go from
+  error to decoded and no other scan changes. The `openwraw` floor is 4.0.2 in
+  `Cargo.toml` and in the `waters` and `all` extras of `openmassspec`.
+
 ## [2.1.0] - 2026-11-23
 
 ### Fixed
