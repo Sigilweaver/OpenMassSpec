@@ -24,10 +24,6 @@ A path is treated as Waters when:
 
 ## Known gaps
 
-- With `openwraw` 4.0.1, some Encoding D scans fail to decode with
-  `intensity word 0x20000000 has no mantissa`, and a default
-  `vendor2mzml convert` then refuses the file. This is seen on the public
-  PXD053170 bundles (282 of 1677 scans in function 1).
 - MSe DDA reconstruction (high/low energy pairing into precursor /
   product) is left to downstream tools; the writer emits the two
   energy traces as independent functions.
