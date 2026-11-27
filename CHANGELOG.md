@@ -68,9 +68,11 @@ Files that convert today can fail or read differently:
   window.
 - The writer rejects malformed records (unsorted or non-finite m/z, array
   length mismatch, `ms_level` 0, a duplicate native id, a missing retention
-  time in a run that has them, a collision energy with no unit that the
-  format does not declare): `convert` counts them as skipped and lists the
-  causes, `--strict` stops on them. These cannot be allowed with `--allow`.
+  time in a run that has them): `convert` counts them as skipped and lists
+  the causes, `--strict` stops on them. These cannot be allowed with
+  `--allow`. A collision energy with no unit is rejected the same way unless
+  the format declares it never states one or `--allow
+  unknown_collision_energy_unit` is given.
 - `vendor2mzml convert` exits 4 when records were skipped or the reader's
   spectrum count could not be reconciled, and prints the cause of each of the
   first skipped records. It used to exit 0 and print only a count. Warnings
@@ -86,7 +88,8 @@ Files that convert today can fail or read differently:
   quad files have their peaks sorted by m/z (counted, with a warning);
   Agilent MRM spectra no longer carry a `mrm_channel=N` precursor reference.
 - `vendor2mzml info` no longer prints a retention time range of 0.0 for a
-  run with no retention times; it omits the range and prints `no rt: N`.
+  run with no retention times; it omits the range and prints `no rt: N`. The
+  JSON `rt_min_sec` and `rt_max_sec` are `null` then.
 
 ### Added
 
