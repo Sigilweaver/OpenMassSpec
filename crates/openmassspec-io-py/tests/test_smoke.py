@@ -287,12 +287,12 @@ def test_unstated_formats_convert_without_allow(vendor: str, check: str, code: s
     assert summary["spectra_skipped"] == 0
     assert summary["warning_counts"][code] > 0
     assert summary["warning_counts"]["unstated_by_source"] == 1
-    flagged = [
-        spec
-        for spec in opio.iter_spectra(str(path))
-        if code in [w["code"] for w in spec.warnings]
-    ]
-    assert flagged, "no spectrum carries the warning"
+    # The writer adds these warnings as it writes: the mzML carries one per
+    # record, and the spectra the reader yields do not.
+    text = (tmp_path / "out.mzML").read_text(errors="replace")
+    assert text.count(f"openmassspec: warning {code}") == summary["warning_counts"][code]
+    assert text.count("openmassspec: warning unstated_by_source") == 1
+    assert next(opio.iter_spectra(str(path))).ms_level >= 1
 
 
 def test_to_mzml_spool_dir_is_accepted(tmp_path: Path):

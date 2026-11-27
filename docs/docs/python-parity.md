@@ -22,7 +22,7 @@ this contract.
 `polarity`, `scan_mode`, `analyzer`, `acquisition_event_id`, `filter`,
 `retention_time_sec`, `low_mz`, `high_mz`, `ion_injection_time_ms`,
 `inv_mobility`, `faims_cv`, `precursor`, `mz`, `intensity`,
-`inv_mobility_per_peak`, `extra`, and `warnings` (a list of
+`inv_mobility_per_peak`, `extra`, and `warnings` (the reader's warnings, a list of
 `{"code", "message"}` dictionaries). `retention_time_sec` is `None` when the
 reader could not state one. `reported_total_ion_current`,
 `reported_base_peak_mz`, and `reported_base_peak_intensity` preserve the

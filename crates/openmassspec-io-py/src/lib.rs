@@ -231,11 +231,13 @@ impl Spectrum {
     fn extra(&self) -> PyResult<std::collections::BTreeMap<String, String>> {
         self.rec_ref().map(|r| r.extra.clone())
     }
-    /// Warnings the reader or a lenient mode put on this spectrum, as a
-    /// list of `{"code": ..., "message": ...}` dicts (empty when none).
-    /// Codes include `empty_spectrum` (no peaks), `unknown_scan_mode`,
-    /// `unknown_collision_energy_unit` and reader-specific ones such as
-    /// `opentfraw.charge_without_selected_mz`.
+    /// Warnings the reader put on this spectrum, as a list of
+    /// `{"code": ..., "message": ...}` dicts (empty when none). Codes include
+    /// `empty_spectrum` (no peaks) and reader-specific ones such as
+    /// `opentfraw.charge_without_selected_mz`. The warnings `to_mzml` adds
+    /// while writing (`unknown_scan_mode`, `unknown_collision_energy_unit`,
+    /// `centroid_not_applied`) are in its `warning_counts` and the mzML, not
+    /// here.
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyList>> {
         warnings_to_list(py, &self.rec_ref()?.warnings)

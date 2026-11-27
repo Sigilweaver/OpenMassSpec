@@ -58,8 +58,9 @@ record.
 
 A record written with a warning (an empty spectrum, a scan mode or
 collision energy unit the format never states) also raises a
-`RuntimeWarning` naming the code and the count, and `Spectrum.warnings`
-lists its warnings. `to_mzml(..., spool_dir=...)` sets where the writer
+`RuntimeWarning` naming the code and the count. `Spectrum.warnings` lists
+the warnings the reader set (for example `empty_spectrum`); the ones the
+writer adds are in the `warning_counts` of the `to_mzml` result. `to_mzml(..., spool_dir=...)` sets where the writer
 keeps encoded spectra once they pass 64 MiB; the default is the output's
 directory.
 

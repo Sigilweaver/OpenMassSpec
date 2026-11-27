@@ -57,8 +57,8 @@ Files that convert today can fail or read differently:
   spectra unchanged. No `--allow` is needed for either.
 - Empty spectra carry the warning `empty_spectrum` and no base peak or m/z
   range (they were written with 0.0). Warnings are userParams in mzML
-  (`openmassspec: warning CODE`), `Spectrum.warnings` in Python, and the
-  `warnings` column in Arrow. `vendor2mzml validate` flags an mzML spectrum
+  (`openmassspec: warning CODE`); the warnings a reader sets are also
+  `Spectrum.warnings` in Python and the `warnings` column in Arrow. `vendor2mzml validate` flags an mzML spectrum
   with no peaks as empty, so third-party mzML files with empty scans still
   validate.
 - `<scanWindowList>` is written only where the reader states the instrument's
