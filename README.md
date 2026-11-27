@@ -151,7 +151,7 @@ force a new `openmassspec-io` major. A reader failure is
 add that reader crate as a dependency and downcast:
 
 ```rust,ignore
-// Cargo.toml: opentfraw = "3" alongside openmassspec-io.
+// Cargo.toml: opentfraw = "4" alongside openmassspec-io.
 match openmassspec_io::collect(&detected) {
     Ok((records, _meta)) => println!("{} spectra", records.len()),
     Err(err) => {

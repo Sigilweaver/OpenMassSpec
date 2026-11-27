@@ -1,7 +1,7 @@
 # CI for OpenMassSpec (umbrella).
 #
-# The workspace pulls openmassspec-core, opentfraw, opentimstdf, openwraw,
-# openaraw, and opensxraw from crates.io (registry versions pinned in
+# The workspace pulls openmassspec-core, openmassspec-arrow and the six
+# readers from crates.io (registry versions pinned in
 # Cargo.toml), so only this repo needs to be checked out. The rust and
 # python matrices mirror release.yml/publish.yml's wheel-build matrix
 # (Ubuntu, macOS, Windows) per CI_STANDARDS.md - every OS a wheel/binary
@@ -236,14 +236,10 @@ jobs:
         # openmassspec-io was built from this checkout in the prior step.
         run: pip install ./python --no-deps
       - name: Install standalone readers for parity
-        id: readers
         if: needs.python-changes.outputs.run == 'true' && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         # Installed from PyPI at the exact versions Cargo.lock resolves, so
         # the native wheels and the readers compiled into openmassspec-io
-        # report the same software_version. If any locked version is not on
-        # PyPI yet (a reader release that is still pending), nothing is
-        # installed and the native comparisons skip instead of failing; this
-        # turns itself back on once every locked version is published.
+        # report the same software_version.
         run: |
           pins=$(python - <<'PY'
           import tomllib
@@ -256,23 +252,8 @@ jobs:
           print(" ".join(pins))
           PY
           )
-          missing=""
-          for pin in $pins; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/${pin%%==*}/${pin##*==}/json")
-            case "$code" in
-              200) ;;
-              404) missing="$missing $pin" ;;
-              *) echo "PyPI lookup for $pin returned HTTP $code"; exit 1 ;;
-            esac
-          done
-          if [ -n "$missing" ]; then
-            echo "Not on PyPI yet:$missing; skipping the native parity comparisons."
-            echo "installed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           echo "Installing $pins"
           pip install $pins
-          echo "installed=true" >> "$GITHUB_OUTPUT"
       - name: Download fixtures for Python parity
         if: needs.python-changes.outputs.run == 'true' && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: python scripts/fetch-python-parity-fixtures.py
@@ -294,7 +275,7 @@ jobs:
           OPENMASSSPEC_AGILENT_D: corpus/agilent/180814-Sample19.d
           OPENMASSSPEC_SCIEX_WIFF: corpus/sciex/PXD022088/Rcor2KOESC1.wiff
           OPENMASSSPEC_SHIMADZU_RAW: corpus/shimadzu/PXD034978/49_27a__8122021_11.qgd
-          OPENMASSSPEC_REQUIRE_PARITY: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' && steps.readers.outputs.installed == 'true' && '1' || '0' }}
+          OPENMASSSPEC_REQUIRE_PARITY: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' && '1' || '0' }}
         run: pytest crates/openmassspec-io-py/tests -v
 
   docs-validation:

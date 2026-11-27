@@ -68,7 +68,7 @@ releases a new major version. To inspect reader-specific detail, depend
 on that reader crate directly and downcast `Error::reader_error()`:
 
 ```rust,ignore
-// Cargo.toml: opentfraw = "3" alongside openmassspec-io.
+// Cargo.toml: opentfraw = "4" alongside openmassspec-io.
 match openmassspec_io::collect(&detected) {
     Ok((records, _meta)) => println!("{} spectra", records.len()),
     Err(err) => {

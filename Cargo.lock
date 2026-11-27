@@ -1157,7 +1157,8 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "openaraw"
 version = "2.0.0"
-source = "git+https://github.com/Sigilweaver/OpenARaw?rev=d5c12a236ad7cbf354f6f2d789a31bec1995d166#d5c12a236ad7cbf354f6f2d789a31bec1995d166"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fc090767814fd10076df9ed14ea2aeffeb596f9ee9380e45d45a4c4e95b277a"
 dependencies = [
  "byteorder",
  "log",
@@ -1169,7 +1170,8 @@ dependencies = [
 [[package]]
 name = "openmassspec-arrow"
 version = "4.0.0"
-source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?rev=ab7b7f7851cc26e518688d04a144c7fc0c42afd5#ab7b7f7851cc26e518688d04a144c7fc0c42afd5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "541863a12c181a0f2110e4c3decdd98b4b50c546be37e9890b5efb3e57a4e30c"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -1180,7 +1182,8 @@ dependencies = [
 [[package]]
 name = "openmassspec-core"
 version = "4.0.0"
-source = "git+https://github.com/Sigilweaver/OpenMassSpecCore?rev=ab7b7f7851cc26e518688d04a144c7fc0c42afd5#ab7b7f7851cc26e518688d04a144c7fc0c42afd5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02d7ef176e333695889260a1e0ebb1d42a53c064aa92dffd59cbacba28a551af"
 dependencies = [
  "flate2",
  "serde",
@@ -1227,7 +1230,8 @@ dependencies = [
 [[package]]
 name = "opensxraw"
 version = "0.5.0"
-source = "git+https://github.com/Sigilweaver/OpenSXRaw?rev=330ab80e5416847dfdca63080bb4d4b3c3a1c2b8#330ab80e5416847dfdca63080bb4d4b3c3a1c2b8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa409949a729ba38217ecf5bce89a30ece2da119b1557754e388d9392eeeadf5"
 dependencies = [
  "byteorder",
  "cfb",
@@ -1239,7 +1243,8 @@ dependencies = [
 [[package]]
 name = "openszraw"
 version = "0.4.0"
-source = "git+https://github.com/Sigilweaver/OpenSZRaw?rev=b2da100496620535c300ebb1541a5c1c6c7d36d1#b2da100496620535c300ebb1541a5c1c6c7d36d1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9694d9dab60e170a5b9d8eb0cf661b7143bffbc0d3fa816b2626018e9c24a379"
 dependencies = [
  "byteorder",
  "cfb",
@@ -1251,7 +1256,8 @@ dependencies = [
 [[package]]
 name = "opentfraw"
 version = "4.0.0"
-source = "git+https://github.com/Sigilweaver/OpenTFRaw?rev=b069696083e2c932c53e281c1ea03246fe05cf18#b069696083e2c932c53e281c1ea03246fe05cf18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "857171b9d28228bb4a48bbcaf96de9ee383f7329a3992cf5c874dc1619524aca"
 dependencies = [
  "openmassspec-core",
  "roxmltree",
@@ -1261,7 +1267,8 @@ dependencies = [
 [[package]]
 name = "opentimstdf"
 version = "4.0.0"
-source = "git+https://github.com/Sigilweaver/OpenTimsTDF?rev=ebead58a4a8612b9c13dc56b4523533fb3618fe6#ebead58a4a8612b9c13dc56b4523533fb3618fe6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a77d07d57b8ed04c888c3eaf61623feb4e38658f3f8627cf3ff72e10b7688bc6"
 dependencies = [
  "log",
  "openmassspec-core",
@@ -1273,7 +1280,8 @@ dependencies = [
 [[package]]
 name = "openwraw"
 version = "5.0.0"
-source = "git+https://github.com/Sigilweaver/OpenWRaw?rev=2c05e3c956ca6ab4e54716aac47faca48fa401e6#2c05e3c956ca6ab4e54716aac47faca48fa401e6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d342d3965c28658f8d06b20471500205af74236bc69b69758a454822e6448c2d"
 dependencies = [
  "log",
  "openmassspec-core",
@@ -1507,9 +1515,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.42.0"
+version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4edff0039f148731aee2fd80f76dbfeb12d204ab3d1c544838d34e02151049b"
+checksum = "f172c4812a19b26d1c23cdb0070e69db335503dfa378b910eb857386e5b8beba"
 dependencies = [
  "bitflags",
  "fallible-iterator",
