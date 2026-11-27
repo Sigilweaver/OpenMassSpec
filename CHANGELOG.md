@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-11-27
+
+### Fixed
+
+- Thermo: TSQ Vantage files whose scans do not state their peak count are read
+  correctly (`opentfraw` 3.1.1, Sigilweaver/OpenTFRaw#100). With `opentfraw`
+  3.1.0 (OpenMassSpec 2.1.1) the reader assumed a peak count of `data_size - 1`
+  for these scans, so some decoded misaligned and a default `vendor2mzml
+  convert` wrote wrong m/z values for them and skipped others. The reader now
+  checks the count against the scan index and, when it disagrees, uses the one
+  count that agrees. In the public PXD020246 acquisition (`TSQVantage.RAW`,
+  `iota_sp_1-1.RAW` on PRIDE), 1,969 of 35,098 scans were affected (1,911 with
+  unsorted or non-finite m/z, which 2.1.1 wrote to the mzML, 4 that failed to
+  decode and were skipped, 54 with ascending but wrong values).
+  `vendor2mzml convert` now writes all 35,098 spectra (2.1.1 wrote 35,094 and
+  skipped 4), `validate` passes on the file and on the mzML
+  (2.1.1 failed with `scan data record ending at offset 0x5a7dcb does not
+  match a known layout`), and the 1,969 recovered scans carry the spectrum
+  userParam `opentfraw.peak_count_recovered` in the mzML. The other 33,129
+  scans decode identically. A scan for which no single count agrees would carry
+  `opentfraw.peak_count_unverified`; PXD020246 has none. The `opentfraw` floor
+  is 3.1.1 in `Cargo.toml` and in the `thermo` and `all` extras of
+  `openmassspec`.
+
 ## [2.1.1] - 2026-11-26
 
 ### Fixed

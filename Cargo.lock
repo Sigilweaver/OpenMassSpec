@@ -1191,7 +1191,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "openaraw",
  "openmassspec-arrow",
@@ -1206,7 +1206,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-cli"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "clap",
  "flate2",
@@ -1217,7 +1217,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-py"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "arrow",
  "numpy",
@@ -1254,9 +1254,9 @@ dependencies = [
 
 [[package]]
 name = "opentfraw"
-version = "3.1.0"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aacff4dd9ec32e3f8662f8d42911ecd25374caa3ca153f228159a4ffc39c5ca8"
+checksum = "80dbce17dbfeb751adc8c349f8cb2a9554605ed100290e84908cd9cf9e0f26b2"
 dependencies = [
  "openmassspec-core",
  "roxmltree",
