@@ -1251,7 +1251,7 @@ dependencies = [
 [[package]]
 name = "opentfraw"
 version = "4.0.0"
-source = "git+https://github.com/Sigilweaver/OpenTFRaw?rev=521c7d044c7eeb26ad38edefbe0106e84d0d3011#521c7d044c7eeb26ad38edefbe0106e84d0d3011"
+source = "git+https://github.com/Sigilweaver/OpenTFRaw?rev=b069696083e2c932c53e281c1ea03246fe05cf18#b069696083e2c932c53e281c1ea03246fe05cf18"
 dependencies = [
  "openmassspec-core",
  "roxmltree",

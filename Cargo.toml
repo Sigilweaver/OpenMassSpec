@@ -34,7 +34,7 @@ unsafe_code = "forbid"
 [patch.crates-io]
 openmassspec-core = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", rev = "ab7b7f7851cc26e518688d04a144c7fc0c42afd5" }
 openmassspec-arrow = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", rev = "ab7b7f7851cc26e518688d04a144c7fc0c42afd5" }
-opentfraw = { git = "https://github.com/Sigilweaver/OpenTFRaw", rev = "521c7d044c7eeb26ad38edefbe0106e84d0d3011" }
+opentfraw = { git = "https://github.com/Sigilweaver/OpenTFRaw", rev = "b069696083e2c932c53e281c1ea03246fe05cf18" }
 openwraw = { git = "https://github.com/Sigilweaver/OpenWRaw", rev = "2c05e3c956ca6ab4e54716aac47faca48fa401e6" }
 opentimstdf = { git = "https://github.com/Sigilweaver/OpenTimsTDF", rev = "ebead58a4a8612b9c13dc56b4523533fb3618fe6" }
 openaraw = { git = "https://github.com/Sigilweaver/OpenARaw", rev = "d5c12a236ad7cbf354f6f2d789a31bec1995d166" }
