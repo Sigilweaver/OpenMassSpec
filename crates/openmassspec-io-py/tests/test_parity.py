@@ -107,18 +107,28 @@ def native_spectra(vendor: str, native, reader, path: Path):
         for record in native.iter_spectra(str(path)):
             yield record.native_id, (lambda f, r=record: getattr(r, f)), record.mz, record.intensity
     elif vendor == "thermo":
-        # `iter_records` holds the centroid peak list of every scan. The
-        # shared surface exports a profile scan as profile data, which the
-        # standalone reader returns from `profile`; bins the shared surface
-        # drops (m/z that is not positive, or NaN) are dropped here too.
+        # `iter_records` holds the centroid peak list of every scan and
+        # labels it centroid. The shared surface exports a scan that has a
+        # profile as profile data, which the standalone reader returns from
+        # `profile`; bins the shared surface drops (m/z that is not
+        # positive, or NaN) are dropped here too.
         for record in reader.iter_records():
             mz, intensity = record["mz"], record["intensity"]
-            if record["scan_mode"] == "profile":
+            get_field = record.__getitem__
+            if reader.profile_chunks(record["scan_number"]) is not None:
                 profile_mz, profile_intensity = reader.profile(record["scan_number"])
                 keep = profile_mz > 0
                 assert keep.any(), (record["native_id"], "profile read has no usable bins")
                 mz, intensity = profile_mz[keep], profile_intensity[keep]
-            yield record["native_id"], record.__getitem__, mz, intensity
+                # The standalone record describes its centroid peak list, so
+                # the label and the m/z range come from the profile instead.
+                overrides = {
+                    "scan_mode": "profile",
+                    "low_mz": float(mz.min()),
+                    "high_mz": float(mz.max()),
+                }
+                get_field = lambda f, r=record, o=overrides: o[f] if f in o else r[f]
+            yield record["native_id"], get_field, mz, intensity
     else:
         for record in reader.iter_records():
             yield record["native_id"], record.__getitem__, record["mz"], record["intensity"]
@@ -134,6 +144,10 @@ def assert_spectrum_parity(vendor: str, shared, native_record) -> None:
                 assert native_mobility is None
             else:
                 np.testing.assert_array_equal(shared_mobility, native_mobility)
+        elif field.startswith("reported_base_peak") and len(shared.mz) == 0:
+            # A spectrum with no peaks states no base peak. The standalone
+            # reader still returns the value its scan record reported.
+            assert getattr(shared, field) is None, (vendor, shared.index, field)
         else:
             assert getattr(shared, field) == get_field(field), (vendor, shared.index, field)
     assert shared.native_id == native_id
