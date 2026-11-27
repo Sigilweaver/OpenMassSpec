@@ -187,14 +187,107 @@ fn shimadzu_lcd_qtof_smoke() {
     smoke(shimadzu_lcd_qtof_fixture());
 }
 
-#[test]
-fn agilent_smoke() {
-    smoke(agilent_fixture());
+/// Convert `input` with `opts` and return the mzML text and the write
+/// summary.
+fn convert_text(
+    input: &std::path::Path,
+    tag: &str,
+    opts: &openmassspec_io::ConvertOptions,
+) -> (String, openmassspec_io::core::WriteSummary) {
+    let det = openmassspec_io::detect_format(input).expect("detect");
+    let out = std::env::temp_dir().join(format!(
+        "msio-{tag}-{}-{}.mzML",
+        input_tag(input),
+        std::process::id()
+    ));
+    let summary = openmassspec_io::convert_to_mzml(&det, &out, opts).expect("convert");
+    let text = fs::read_to_string(&out).expect("read");
+    let _ = fs::remove_file(&out);
+    (text, summary)
 }
 
+/// Agilent Q-TOF scan records give the collision energy as a bare number.
+/// `openaraw` declares that the format never states the unit, so the file
+/// converts with no `Leniency`: every MS/MS spectrum carries the warning
+/// and the run carries one `unstated_by_source`.
 #[test]
-fn sciex_smoke() {
-    smoke(sciex_fixture());
+fn agilent_converts_by_default_with_unit_warnings() {
+    let input = agilent_fixture();
+    if skip_missing(&input) {
+        return;
+    }
+    let det = openmassspec_io::detect_format(&input).expect("detect");
+    let meta = openmassspec_io::metadata_only(&det).expect("metadata");
+    assert!(
+        meta.unstated
+            .contains(&openmassspec_io::core::Check::UnknownCollisionEnergyUnit),
+        "openaraw no longer declares the collision energy unit as never stated"
+    );
+    let (text, summary) = convert_text(
+        &input,
+        "agilent-default",
+        &openmassspec_io::ConvertOptions::new(),
+    );
+    assert_eq!(summary.skipped(), 0, "{:?}", summary.issues);
+    let units = summary.warning_counts["unknown_collision_energy_unit"];
+    assert!(units > 0, "no MS/MS spectrum carried a collision energy");
+    assert_eq!(summary.warning_counts["unstated_by_source"], 1);
+    assert_eq!(
+        text.matches("openmassspec: warning unknown_collision_energy_unit")
+            .count(),
+        units
+    );
+    assert_eq!(
+        text.matches("openmassspec: warning unstated_by_source")
+            .count(),
+        1
+    );
+}
+
+/// No decoded stream in a `.wiff` states the scan mode. `opensxraw`
+/// declares it, so the file converts with no `Leniency`, without asserting
+/// profile or centroid, and `with_centroid` leaves the spectra unchanged.
+#[test]
+fn sciex_converts_by_default_without_a_scan_mode_term() {
+    let input = sciex_fixture();
+    if skip_missing(&input) {
+        return;
+    }
+    let det = openmassspec_io::detect_format(&input).expect("detect");
+    let meta = openmassspec_io::metadata_only(&det).expect("metadata");
+    assert!(
+        meta.unstated
+            .contains(&openmassspec_io::core::Check::UnknownScanMode),
+        "opensxraw no longer declares the scan mode as never stated"
+    );
+    let (plain, summary) = convert_text(
+        &input,
+        "sciex-default",
+        &openmassspec_io::ConvertOptions::new(),
+    );
+    assert_eq!(summary.skipped(), 0, "{:?}", summary.issues);
+    let spectra = summary.spectra_written;
+    assert!(spectra > 0);
+    assert_eq!(summary.warning_counts["unknown_scan_mode"], spectra);
+    assert_eq!(summary.warning_counts["unstated_by_source"], 1);
+    assert!(
+        !plain.contains(r#"accession="MS:1000127""#),
+        "asserts centroid"
+    );
+    assert!(
+        !plain.contains(r#"accession="MS:1000128""#),
+        "asserts profile"
+    );
+
+    let (centroided, summary) = convert_text(
+        &input,
+        "sciex-centroid",
+        &openmassspec_io::ConvertOptions::new().with_centroid(true),
+    );
+    assert_eq!(summary.skipped(), 0, "{:?}", summary.issues);
+    assert_eq!(summary.warning_counts["centroid_not_applied"], spectra);
+    assert!(!centroided.contains(r#"accession="MS:1000127""#));
+    assert!(!centroided.contains(r#"accession="MS:1000128""#));
 }
 
 /// After converting with `ConvertOptions::with_centroid`, no spectrum in the output should
@@ -256,11 +349,6 @@ fn shimadzu_centroid_smoke() {
 #[test]
 fn agilent_centroid_smoke() {
     centroid_smoke(agilent_fixture());
-}
-
-#[test]
-fn sciex_centroid_smoke() {
-    centroid_smoke(sciex_fixture());
 }
 
 /// `stream()`/`metadata_only()` must agree with `collect()` on both the

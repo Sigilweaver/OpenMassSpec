@@ -44,12 +44,33 @@ print(summary["spectra_written"], summary["spectra_skipped"])
 ```
 
 `to_mzml` leaves out spectra and chromatograms the reader cannot decode
-(`skip_unreadable=True`, the default), issues a `RuntimeWarning` with
-the count, and returns a dict with `spectra_written`, `spectra_skipped`,
-`chromatograms_written`, and `chromatograms_skipped`. Pass
-`skip_unreadable=False` to raise `RuntimeError` at the first unreadable
-record. `iter_spectra`, `read_arrow`, and `read_chromatograms` always
-raise on an unreadable record.
+or the writer's checks refuse (`skip_unreadable=True`, the default), and
+issues a `RuntimeWarning` with the count. It returns a dict with
+`spectra_written`, `spectra_skipped`, `spectra_invalid` (refused by the
+writer's checks), `chromatograms_written`, `chromatograms_skipped`,
+`chromatograms_invalid`, `warning_counts` (records written per warning
+code), `issues` (the first causes, as `{kind, position, record_id, cause}`
+dicts), `issues_truncated`, and `spectrum_count_mismatch` (`None`, or
+`(announced, accounted_for)`). Pass `skip_unreadable=False` to raise
+`RuntimeError` at the first unreadable record. `iter_spectra`,
+`read_arrow`, and `read_chromatograms` always raise on an unreadable
+record.
+
+A record written with a warning (an empty spectrum, a scan mode or
+collision energy unit the format never states) also raises a
+`RuntimeWarning` naming the code and the count, and `Spectrum.warnings`
+lists its warnings. `to_mzml(..., spool_dir=...)` sets where the writer
+keeps encoded spectra once they pass 64 MiB; the default is the output's
+directory.
+
+## Allowing a check
+
+`to_mzml`, `iter_spectra` and `read_arrow` take `allow=[...]`, a list of
+check names that may continue with a warning instead of failing:
+`"unknown_scan_mode"`, `"unknown_collision_energy_unit"` and
+`"dangling_precursor_ref"` (an unknown name raises `ValueError`). Formats
+that never state the scan mode (SCIEX) or the collision energy unit
+(Agilent Q-TOF) need none; `RunInfo.unstated` lists what a format declares.
 
 The functions `detect_format`, `to_mzml`, `iter_spectra`, and the
 `Spectrum` class are re-exported from `openmassspec_io`. You can also
@@ -94,8 +115,8 @@ for s in op.iter_spectra("sample.raw", centroid=True):
 ## Iterate spectra (numpy)
 
 `iter_spectra` yields `Spectrum` objects whose peak arrays are
-zero-copy numpy views over Rust-owned buffers. Each peak array can be
-read exactly once (the buffer is moved into numpy on first access).
+numpy arrays over Rust-owned buffers (the buffer moves into numpy on
+first access, and later accesses return the same array).
 
 ```python
 import openmassspec_io as op
@@ -104,7 +125,7 @@ for s in op.iter_spectra("sample.raw"):
     if s.ms_level == 1:
         mz   = s.mz             # numpy.ndarray, dtype=float64
         intensity = s.intensity # numpy.ndarray, dtype=float32
-        print(s.index, s.retention_time_sec, mz.size)
+        print(s.index, s.retention_time_sec, mz.size)  # rt is None if unknown
 ```
 
 For Bruker TDF, ion-mobility scans expose a per-peak inverse-mobility

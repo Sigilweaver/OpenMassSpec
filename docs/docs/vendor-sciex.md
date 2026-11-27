@@ -16,6 +16,16 @@ A `.wiff` file with no paired `.wiff.scan` file is **not** detected -
 `detect_format` returns `None` even though the extension matches,
 because the reader needs the paired scan file to decode spectra.
 
+## Scan mode
+
+No decoded stream in a `.wiff` says whether a spectrum is profile or
+centroid, so `opensxraw` leaves the scan mode unset and declares that the
+format never states it. `convert` therefore writes SCIEX spectra with
+neither the profile nor the centroid term, each with the warning
+`unknown_scan_mode`, and the run with `unstated_by_source`; it needs no
+`--allow`. `--centroid` leaves these spectra unchanged (with a
+`centroid_not_applied` warning).
+
 ## Covered features
 
 - TripleTOF and QTRAP acquisitions.
@@ -33,10 +43,9 @@ because the reader needs the paired scan file to decode spectra.
   information. See [OpenSXRaw's format
   writeups](https://github.com/Sigilweaver/OpenSXRaw/blob/main/docs/format/03-wiff2-container.md)
   for the investigation.
-- The reader currently reports every spectrum as profile-mode / TOFMS
-  analyzer regardless of actual instrument family - QTRAP records are
-  nominal-mass, not true TOF. This is a simplification, not yet
-  instrument-aware.
+- The reader reports every spectrum with the TOF analyzer regardless of
+  actual instrument family - QTRAP records are nominal-mass, not true TOF.
+  This is a simplification, not yet instrument-aware.
 
 ## Tested instruments
 

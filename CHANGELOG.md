@@ -4,6 +4,107 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+OpenMassSpec 3.0.0 builds on `openmassspec-core` 4 and the six reader majors
+released against it: `opentfraw` 4.0.0, `opentimstdf` 4.0.0, `openwraw`
+5.0.0, `openaraw` 2.0.0, `opensxraw` 0.5.0, `openszraw` 0.4.0. Python 3.10 is
+the new minimum (wheels are abi3-py310).
+
+### API breaks
+
+- Python, `Spectrum.precursor` and the other record dicts: `collision_energy`
+  and `ce_is_nce` are gone. `collision_energies` is a list of
+  `{"value", "unit"}` dicts, one per energy (stepped energies have several),
+  and `unit` is `"ev"`, `"nce"` or `None` when the file does not state it.
+  Core 3 wrote `ce_is_nce: false` for energies whose unit the reader did not
+  know; they are now `None`, not eV.
+- Python: `Spectrum.retention_time_sec` is `None` when the reader could not
+  state one (it was `0.0`). `Spectrum.analyzer`, `precursor["analyzer"]` and
+  `RunInfo.analyzers` use the stack-wide labels (`"tof"`, not `"tofms"`).
+  `Spectrum.base_peak_mz` and `base_peak_intensity` are `None` on a spectrum
+  with no peaks (they were `0.0`).
+- Python `to_mzml` returns `spectra_invalid`, `chromatograms_invalid`,
+  `warning_counts`, `issues`, `issues_truncated` and
+  `spectrum_count_mismatch` as well. It raises a `RuntimeWarning` for every
+  warning code it wrote.
+- Python `read_arrow` batches follow the schema of `openmassspec-arrow` 4:
+  `precursor_ce_is_nce` is replaced by `precursor_collision_energy_unit`,
+  and `precursor_collision_energies`, `scan_windows` and `warnings` are new.
+  Arrow files written by 3.x have no schema version and are rejected.
+- Rust: depends on `openmassspec-core` 4 and `openmassspec-arrow` 4, which
+  `openmassspec_io::core` and `openmassspec_io::arrow` re-export. The Arrow
+  builder is at `openmassspec_io::arrow::arrow_60::SpectrumBatchBuilder` and
+  `push` returns a `BatchError`. `SpectrumRecord::retention_time_sec` is an
+  `Option`, and a precursor holds `collision_energies`.
+- The crates and Python packages are version 3.0.0.
+
+### Behavior changes
+
+Files that convert today can fail or read differently:
+
+- `--centroid` (and `centroid=True`, `ConvertOptions::with_centroid`) picks
+  peaks only from spectra declared profile. A spectrum with no declared scan
+  mode is an error unless its format declares that it never states one (see
+  the next item), and a "profile" spectrum that is a sparse peak list is an
+  error.
+- Formats that never state a value convert with warnings instead of an
+  error. SCIEX `.wiff` never states the scan mode: each spectrum is written
+  with neither the profile nor the centroid term and the warning
+  `unknown_scan_mode` (it used to be written as "profile spectrum", which was
+  a guess). Agilent Q-TOF scan records never state the collision energy
+  unit: each MS/MS spectrum is written with a unit-less collision energy
+  and the warning `unknown_collision_energy_unit` (Core 3 wrote eV). The run
+  carries one `unstated_by_source` warning. `--centroid` leaves SCIEX
+  spectra unchanged. No `--allow` is needed for either.
+- Empty spectra carry the warning `empty_spectrum` and no base peak or m/z
+  range (they were written with 0.0). Warnings are userParams in mzML
+  (`openmassspec: warning CODE`), `Spectrum.warnings` in Python, and the
+  `warnings` column in Arrow. `vendor2mzml validate` flags an mzML spectrum
+  with no peaks as empty, so third-party mzML files with empty scans still
+  validate.
+- `<scanWindowList>` is written only where the reader states the instrument's
+  acquisition range. Core 3 wrote the observed m/z range. OpenTimsTDF now
+  states the acquisition range on every spectrum; the others write no
+  window.
+- The writer rejects malformed records (unsorted or non-finite m/z, array
+  length mismatch, `ms_level` 0, a duplicate native id, a missing retention
+  time in a run that has them, a collision energy with no unit that the
+  format does not declare): `convert` counts them as skipped and lists the
+  causes, `--strict` stops on them. These cannot be allowed with `--allow`.
+- `vendor2mzml convert` exits 4 when records were skipped or the reader's
+  spectrum count could not be reconciled, and prints the cause of each of the
+  first skipped records. It used to exit 0 and print only a count. Warnings
+  on records do not change the exit status.
+- Reader changes that alter decoded values (see each reader's changelog):
+  Thermo reads the collision energy unit from the file (NCE or eV; a unit the
+  file does not state stays unknown), lists every collision energy step, and
+  keeps a charge with no selected m/z in `extra` with a warning; Waters
+  leaves out the collision energy of ramped and two-cell functions (the raw
+  values stay in `extra`, with a warning) and drops a non-finite sample of a
+  chromatogram with a flag; Shimadzu IT-TOF leaves out the peaks at or below
+  the calibration intercept (counted, with a warning) and Shimadzu single
+  quad files have their peaks sorted by m/z (counted, with a warning);
+  Agilent MRM spectra no longer carry a `mrm_channel=N` precursor reference.
+- `vendor2mzml info` no longer prints a retention time range of 0.0 for a
+  run with no retention times; it omits the range and prints `no rt: N`.
+
+### Added
+
+- `vendor2mzml convert --spool-dir DIR` and Python `to_mzml(spool_dir=...)`:
+  where the writer keeps encoded spectra once they pass 64 MiB, a file about
+  as large as the output. The default is the output's directory (the Python
+  default used the system temp dir, often a small RAM-backed `/tmp`).
+- `vendor2mzml info` prints the checks a format declares it never states
+  (`never stated:`), and a count per warning code; JSON adds `unstated`,
+  `warning_counts` and `spectra_without_rt`. Python `RunInfo.unstated` and
+  `RunInfo.warnings`, and `Spectrum.warnings`.
+- `ConvertOptions::with_leniency` (also applies to centroiding);
+  `vendor2mzml convert --allow CHECK` and `info --allow CHECK` (repeatable);
+  Python `allow=` on `to_mzml`, `iter_spectra` and `read_arrow`;
+  `collect_centroided_with` and `stream_centroided_with`. `--allow` is for a
+  file that fails a strict check the format does not declare it never states:
+  `unknown_scan_mode`, `unknown_collision_energy_unit` or
+  `dangling_precursor_ref` (the reference is dropped).
+
 ## [2.1.2] - 2026-11-27
 
 ### Fixed

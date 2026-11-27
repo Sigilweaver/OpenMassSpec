@@ -4,11 +4,11 @@ build-backend = "maturin"
 
 [project]
 name = "openmassspec-io"
-version = "2.1.2"
+version = "3.0.0"
 description = "Vendor-neutral mass-spec I/O for Thermo, Bruker, Waters, Agilent, SCIEX, and Shimadzu, with mzML and Arrow streaming."
 readme = "README.md"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
 keywords = [
     "mass-spectrometry",

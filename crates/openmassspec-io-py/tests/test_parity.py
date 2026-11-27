@@ -38,7 +38,7 @@ SPECTRUM_FIELDS = (
 
 PRECURSOR_FIELDS = {
     "target_mz", "selected_mz", "isolation_width", "charge", "intensity",
-    "collision_energy", "ce_is_nce", "precursor_native_id", "activation",
+    "collision_energies", "precursor_native_id", "activation",
     "analyzer", "ccs",
 }
 

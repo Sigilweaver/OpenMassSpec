@@ -95,3 +95,39 @@ fn convert_spools_next_to_the_output_not_in_tmpdir() {
 
     fs::remove_dir_all(&out_dir).unwrap();
 }
+
+/// `--spool-dir` decides where the spool goes: pointing it at a directory
+/// that does not exist makes a conversion that spills (past 64 MiB) fail
+/// with an error, where the default would have written next to the output.
+#[test]
+fn spool_dir_option_overrides_the_output_directory() {
+    let input = bruker_fixture();
+    if !input.exists() {
+        assert!(
+            std::env::var("OPENMASSSPEC_REQUIRE_CORPUS").as_deref() != Ok("1"),
+            "OPENMASSSPEC_REQUIRE_CORPUS=1 but fixture is missing: {}",
+            input.display()
+        );
+        eprintln!("skipping: corpus not present at {}", input.display());
+        return;
+    }
+    let out_dir =
+        std::env::temp_dir().join(format!("vendor2mzml-cli-spool-opt-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&out_dir);
+    fs::create_dir_all(&out_dir).unwrap();
+    let out = out_dir.join("run.mzML");
+    let missing = out_dir.join("no-such-spool-dir");
+
+    let result = Command::new(bin_path())
+        .args(["convert", "--spool-dir"])
+        .arg(&missing)
+        .arg(&input)
+        .arg(&out)
+        .output()
+        .expect("spawn vendor2mzml");
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert_eq!(result.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("error"), "{stderr}");
+
+    fs::remove_dir_all(&out_dir).unwrap();
+}

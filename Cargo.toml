@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "2.1.2"
+version = "3.0.0"
 edition = "2021"
 rust-version = "1.95"
 authors = ["Nathan Riley <git@nathanriley.com>"]
@@ -17,14 +17,26 @@ homepage = "https://sigilweaver.app/openmassspec/"
 documentation = "https://sigilweaver.app/openmassspec/docs/"
 
 [workspace.dependencies]
-openmassspec-core = "3.0.0"
-openmassspec-arrow = "3.0.0"
-opentfraw = "3.1.1"
-opentimstdf = "3.0.1"
-openwraw = "4.0.2"
-openaraw = "1.0.0"
-opensxraw = "0.4.0"
-openszraw = "0.3.0"
+openmassspec-core = "4.0.0"
+openmassspec-arrow = "4.0.0"
+opentfraw = "4.0.0"
+opentimstdf = "4.0.0"
+openwraw = "5.0.0"
+openaraw = "2.0.0"
+opensxraw = "0.5.0"
+openszraw = "0.4.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# Temporary: Core 4 and the six readers are not on crates.io yet. Every entry
+# pins a commit. Remove this block when they are released (see PR body).
+[patch.crates-io]
+openmassspec-core = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", rev = "ab7b7f7851cc26e518688d04a144c7fc0c42afd5" }
+openmassspec-arrow = { git = "https://github.com/Sigilweaver/OpenMassSpecCore", rev = "ab7b7f7851cc26e518688d04a144c7fc0c42afd5" }
+opentfraw = { git = "https://github.com/Sigilweaver/OpenTFRaw", rev = "521c7d044c7eeb26ad38edefbe0106e84d0d3011" }
+openwraw = { git = "https://github.com/Sigilweaver/OpenWRaw", rev = "2c05e3c956ca6ab4e54716aac47faca48fa401e6" }
+opentimstdf = { git = "https://github.com/Sigilweaver/OpenTimsTDF", rev = "ebead58a4a8612b9c13dc56b4523533fb3618fe6" }
+openaraw = { git = "https://github.com/Sigilweaver/OpenARaw", rev = "d5c12a236ad7cbf354f6f2d789a31bec1995d166" }
+opensxraw = { git = "https://github.com/Sigilweaver/OpenSXRaw", rev = "330ab80e5416847dfdca63080bb4d4b3c3a1c2b8" }
+openszraw = { git = "https://github.com/Sigilweaver/OpenSZRaw", rev = "b2da100496620535c300ebb1541a5c1c6c7d36d1" }
