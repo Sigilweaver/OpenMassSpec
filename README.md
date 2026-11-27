@@ -53,7 +53,7 @@ The `vendor2mzml` CLI (crate `openmassspec-io-cli`) is not published to
 crates.io; install it from a release tag of this repository:
 
 ```sh
-cargo install --git https://github.com/Sigilweaver/OpenMassSpec --tag v2.1.1 openmassspec-io-cli
+cargo install --git https://github.com/Sigilweaver/OpenMassSpec --tag v2.1.2 openmassspec-io-cli
 ```
 
 The Rust library is on crates.io:
