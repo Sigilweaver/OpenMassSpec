@@ -636,10 +636,12 @@ fn detect(path: PathBuf) -> Option<&'static str> {
 /// Strict checks fail by default. `allow` names the ones that may continue
 /// with a warning on the affected record instead: `"unknown_scan_mode"`
 /// (the reader did not say whether a spectrum is profile or centroid: it is
-/// written with no such term, and `centroid` leaves it unchanged) and
+/// written with no such term, and `centroid` leaves it unchanged),
 /// `"dangling_precursor_ref"` (a precursor names a spectrum that is not in
-/// the output: the reference is dropped) and `"unknown_collision_energy_unit"`
-/// (a collision energy with no unit is written as a unit-less userParam). An unknown name raises
+/// the output: the reference is dropped), `"unknown_collision_energy_unit"`
+/// (a collision energy with no unit is written as a unit-less userParam) and
+/// `"spectrum_count_shortfall"` (a reader that announced more spectra than it
+/// yielded ends with a warning instead of an error). An unknown name raises
 /// `ValueError`.
 ///
 /// Returns a dict with `spectra_written`, `spectra_skipped`,

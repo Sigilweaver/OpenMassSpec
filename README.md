@@ -118,9 +118,9 @@ unit; their readers declare that, so those files convert with no flag, each
 affected spectrum carries a warning `userParam` (`unknown_scan_mode`,
 `unknown_collision_energy_unit`) and the run carries `unstated_by_source`.
 `--allow CHECK` (repeatable) lets any other file continue past a strict
-check the same way: `unknown_scan_mode`, `unknown_collision_energy_unit`, or
+check the same way: `unknown_scan_mode`, `unknown_collision_energy_unit`,
 `dangling_precursor_ref` (a precursor names a spectrum that is not in the
-output: the reference is dropped). `convert` prints a count per warning code
+output: the reference is dropped) or `spectrum_count_shortfall`. `convert` prints a count per warning code
 on stderr; warnings do not change the exit status. `--spool-dir DIR` sets
 where the writer keeps encoded spectra once they pass 64 MiB (default: next
 to the output).

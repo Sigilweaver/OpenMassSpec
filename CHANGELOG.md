@@ -102,8 +102,9 @@ Files that convert today can fail or read differently:
   Python `allow=` on `to_mzml`, `iter_spectra` and `read_arrow`;
   `collect_centroided_with` and `stream_centroided_with`. `--allow` is for a
   file that fails a strict check the format does not declare it never states:
-  `unknown_scan_mode`, `unknown_collision_energy_unit` or
-  `dangling_precursor_ref` (the reference is dropped).
+  `unknown_scan_mode`, `unknown_collision_energy_unit`,
+  `dangling_precursor_ref` (the reference is dropped) or
+  `spectrum_count_shortfall`.
 
 ## [2.1.2] - 2026-11-27
 

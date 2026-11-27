@@ -68,8 +68,9 @@ directory.
 
 `to_mzml`, `iter_spectra` and `read_arrow` take `allow=[...]`, a list of
 check names that may continue with a warning instead of failing:
-`"unknown_scan_mode"`, `"unknown_collision_energy_unit"` and
-`"dangling_precursor_ref"` (an unknown name raises `ValueError`). Formats
+`"unknown_scan_mode"`, `"unknown_collision_energy_unit"`,
+`"dangling_precursor_ref"` and `"spectrum_count_shortfall"` (an unknown name
+raises `ValueError`). Formats
 that never state the scan mode (SCIEX) or the collision energy unit
 (Agilent Q-TOF) need none; `RunInfo.unstated` lists what a format declares.
 

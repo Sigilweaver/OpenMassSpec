@@ -27,6 +27,10 @@ A path is treated as Waters when:
 - MSe DDA reconstruction (high/low energy pairing into precursor /
   product) is left to downstream tools; the writer emits the two
   energy traces as independent functions.
+- A ramped collision energy, or two collision cells, has no single applied
+  energy, so no collision energy is written for those scans. The raw values
+  stay in `extra` (`openwraw.sts.*`) with the warning
+  `openwraw.collision_energy_unstated`.
 - The `_FUNCTNS.INF` ion-mode field is currently mapped to polarity
   only; alternative ion modes (e.g., MS/MS scanning with linked
   quadrupoles) are reported in `scan_mode` but not given a dedicated

@@ -77,6 +77,7 @@ record is written without the value and carries a warning. `--allow CHECK`
 | `unknown_scan_mode` | A spectrum with no profile or centroid flag is written with neither term; `--centroid` leaves it unchanged. |
 | `unknown_collision_energy_unit` | A collision energy with no unit is written as a unit-less `userParam`. |
 | `dangling_precursor_ref` | A precursor that names a spectrum not in the output loses the reference. |
+| `spectrum_count_shortfall` | A reader that announced more spectra than it yielded ends with a warning and exit 4 instead of an error. |
 
 A format that never states the scan mode or the collision energy unit in
 any file says so itself (the reader declares it), and its files convert
