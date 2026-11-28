@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-28
+
 OpenMassSpec 3.0.0 builds on `openmassspec-core` 4 and the six reader majors
 released against it: `opentfraw` 4.0.0, `opentimstdf` 4.0.0, `openwraw`
 5.0.0, `openaraw` 2.0.0, `opensxraw` 0.5.0, `openszraw` 0.4.0. These are the
