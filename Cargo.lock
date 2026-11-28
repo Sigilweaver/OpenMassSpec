@@ -420,9 +420,9 @@ dependencies = [
 
 [[package]]
 name = "cfb"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f13298d9178622b7916ec5d01d470425c04273c8ed07e87b1c38b34c4f4612b"
+checksum = "fef29b910ef2b9dbecc60168d1568d643c633b0518af970c17e83bd5f6e2c94f"
 dependencies = [
  "fnv",
  "uuid",
@@ -1156,9 +1156,9 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "openaraw"
-version = "1.0.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb845b69804da12eff1eaadbc05a9d3dab31c637f450427abc484c7a9d4d7239"
+checksum = "5fc090767814fd10076df9ed14ea2aeffeb596f9ee9380e45d45a4c4e95b277a"
 dependencies = [
  "byteorder",
  "log",
@@ -1169,20 +1169,21 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-arrow"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5aceb590a66da952a89d06cc5251ef254f62666d222d533dff052fc21a174d2"
+checksum = "541863a12c181a0f2110e4c3decdd98b4b50c546be37e9890b5efb3e57a4e30c"
 dependencies = [
  "arrow-array",
  "arrow-schema",
  "openmassspec-core",
+ "thiserror",
 ]
 
 [[package]]
 name = "openmassspec-core"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d11eb6376e628cb354ac492308d43de89994a4292bab74b8393bca5aa12fe463"
+checksum = "02d7ef176e333695889260a1e0ebb1d42a53c064aa92dffd59cbacba28a551af"
 dependencies = [
  "flate2",
  "serde",
@@ -1191,7 +1192,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io"
-version = "2.1.2"
+version = "3.0.0"
 dependencies = [
  "openaraw",
  "openmassspec-arrow",
@@ -1206,7 +1207,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-cli"
-version = "2.1.2"
+version = "3.0.0"
 dependencies = [
  "clap",
  "flate2",
@@ -1217,7 +1218,7 @@ dependencies = [
 
 [[package]]
 name = "openmassspec-io-py"
-version = "2.1.2"
+version = "3.0.0"
 dependencies = [
  "arrow",
  "numpy",
@@ -1228,9 +1229,9 @@ dependencies = [
 
 [[package]]
 name = "opensxraw"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee42f58967c5aea601210afb056da4d00a75b041fae26482d44b5fd02a489ff3"
+checksum = "fa409949a729ba38217ecf5bce89a30ece2da119b1557754e388d9392eeeadf5"
 dependencies = [
  "byteorder",
  "cfb",
@@ -1241,9 +1242,9 @@ dependencies = [
 
 [[package]]
 name = "openszraw"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18fbdeeda0080dcbbde2095d56b67ff17ea6484a6ba5b364ac6bdf715159c541"
+checksum = "9694d9dab60e170a5b9d8eb0cf661b7143bffbc0d3fa816b2626018e9c24a379"
 dependencies = [
  "byteorder",
  "cfb",
@@ -1254,9 +1255,9 @@ dependencies = [
 
 [[package]]
 name = "opentfraw"
-version = "3.1.1"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80dbce17dbfeb751adc8c349f8cb2a9554605ed100290e84908cd9cf9e0f26b2"
+checksum = "857171b9d28228bb4a48bbcaf96de9ee383f7329a3992cf5c874dc1619524aca"
 dependencies = [
  "openmassspec-core",
  "roxmltree",
@@ -1265,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "opentimstdf"
-version = "3.0.1"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afe2ae30ddf71698db79f48bf0c2792af0d82fc49bb89ec3f588bfbd946a177e"
+checksum = "a77d07d57b8ed04c888c3eaf61623feb4e38658f3f8627cf3ff72e10b7688bc6"
 dependencies = [
  "log",
  "openmassspec-core",
@@ -1278,9 +1279,9 @@ dependencies = [
 
 [[package]]
 name = "openwraw"
-version = "4.0.2"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14d77fb63fa2dcb426d811038e5b7424156e3f2f14806a1a68889e07d52f016a"
+checksum = "d342d3965c28658f8d06b20471500205af74236bc69b69758a454822e6448c2d"
 dependencies = [
  "log",
  "openmassspec-core",
@@ -1514,9 +1515,9 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.42.0"
+version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4edff0039f148731aee2fd80f76dbfeb12d204ab3d1c544838d34e02151049b"
+checksum = "f172c4812a19b26d1c23cdb0070e69db335503dfa378b910eb857386e5b8beba"
 dependencies = [
  "bitflags",
  "fallible-iterator",

@@ -29,6 +29,8 @@ CORPORA = {
     "thermo": _corpus("OPENMASSSPEC_THERMO_RAW"),
     "bruker": _corpus("OPENMASSSPEC_BRUKER_D"),
     "waters": _corpus("OPENMASSSPEC_WATERS_RAW"),
+    "agilent": _corpus("OPENMASSSPEC_AGILENT_D"),
+    "sciex": _corpus("OPENMASSSPEC_SCIEX_WIFF"),
 }
 
 
@@ -64,8 +66,14 @@ def test_to_mzml_roundtrip(vendor: str, tmp_path: Path):
     assert set(summary) == {
         "spectra_written",
         "spectra_skipped",
+        "spectra_invalid",
         "chromatograms_written",
         "chromatograms_skipped",
+        "chromatograms_invalid",
+        "warning_counts",
+        "issues",
+        "issues_truncated",
+        "spectrum_count_mismatch",
     }
 
 
@@ -170,6 +178,24 @@ def test_derived_values_do_not_depend_on_read_order(vendor: str):
 
 
 @pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_analyzer_labels_match_arrow(vendor: str):
+    if not hasattr(opio, "read_arrow"):
+        pytest.skip("built without arrow feature")
+    pytest.importorskip("pyarrow")
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    py_labels = []
+    for spec in opio.iter_spectra(str(path)):
+        py_labels.append(spec.analyzer)
+        if len(py_labels) == 64:
+            break
+    batch = next(iter(opio.read_arrow(str(path), batch_size=64)))
+    arrow_labels = batch.column("analyzer").to_pylist()[: len(py_labels)]
+    assert py_labels == arrow_labels
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
 def test_to_mzml_centroid_removes_profile_spectra(vendor: str, tmp_path: Path):
     path = CORPORA[vendor]
     if path is None:
@@ -211,6 +237,80 @@ def test_read_arrow(vendor: str):
         if total >= 64:
             break
     assert total > 0
+
+
+@pytest.mark.parametrize("vendor", ["thermo", "bruker", "waters"])
+def test_spectrum_warnings_and_collision_energies(vendor: str):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    n = 0
+    for spec in opio.iter_spectra(str(path)):
+        warnings = spec.warnings
+        assert isinstance(warnings, list)
+        for w in warnings:
+            assert set(w) == {"code", "message"}
+        if len(spec.mz) == 0:
+            # An empty spectrum is flagged and declares no base peak.
+            assert "empty_spectrum" in [w["code"] for w in warnings]
+            assert spec.base_peak_mz is None
+        if spec.precursor is not None:
+            p = spec.precursor
+            assert "ce_is_nce" not in p
+            for ce in p["collision_energies"]:
+                assert set(ce) == {"value", "unit"}
+                assert ce["unit"] in ("ev", "nce", None)
+        assert spec.retention_time_sec is None or spec.retention_time_sec >= 0
+        n += 1
+        if n >= 200:
+            break
+    assert n > 0
+    run = opio.run_info(str(path))
+    assert run.unstated == []
+    assert isinstance(run.warnings, list)
+
+
+@pytest.mark.parametrize(
+    ("vendor", "check", "code"),
+    [
+        ("agilent", "unknown_collision_energy_unit", "unknown_collision_energy_unit"),
+        ("sciex", "unknown_scan_mode", "unknown_scan_mode"),
+    ],
+)
+def test_unstated_formats_convert_without_allow(vendor: str, check: str, code: str, tmp_path: Path):
+    path = CORPORA[vendor]
+    if path is None:
+        pytest.skip(f"no corpus for {vendor}")
+    assert opio.run_info(str(path)).unstated == [check]
+    with pytest.warns(RuntimeWarning, match=code):
+        summary = opio.to_mzml(str(path), str(tmp_path / "out.mzML"))
+    assert summary["spectra_skipped"] == 0
+    assert summary["warning_counts"][code] > 0
+    assert summary["warning_counts"]["unstated_by_source"] == 1
+    # The writer adds these warnings as it writes: the mzML carries one per
+    # record, and the spectra the reader yields do not.
+    text = (tmp_path / "out.mzML").read_text(errors="replace")
+    assert text.count(f"openmassspec: warning {code}") == summary["warning_counts"][code]
+    assert text.count("openmassspec: warning unstated_by_source") == 1
+    assert next(opio.iter_spectra(str(path))).ms_level >= 1
+
+
+def test_to_mzml_spool_dir_is_accepted(tmp_path: Path):
+    path = CORPORA["thermo"]
+    if path is None:
+        pytest.skip("no corpus for thermo")
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    opio.to_mzml(str(path), str(tmp_path / "x.mzML"), spool_dir=str(spool))
+    assert list(spool.iterdir()) == []
+
+
+def test_unknown_check_name_is_a_value_error(tmp_path: Path):
+    path = CORPORA["thermo"]
+    if path is None:
+        pytest.skip("no corpus for thermo")
+    with pytest.raises(ValueError, match="unknown_scan_mode"):
+        opio.to_mzml(str(path), str(tmp_path / "x.mzML"), allow=["nope"])
 
 
 if __name__ == "__main__":

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openmassspec"
-version = "2.1.2"
+version = "3.0.0"
 description = "Open mass spectrometry: one install for the OpenMassSpec vendor reader stack (Thermo, Bruker, Waters, Agilent, SCIEX, Shimadzu)"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Nathan Riley", email = "git@nathanriley.com" }]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = [
     "mass-spectrometry",
     "proteomics",
@@ -27,7 +27,7 @@ classifiers = [
     "Programming Language :: Rust",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
-dependencies = ["openmassspec-io>=2.0.0,<3"]
+dependencies = ["openmassspec-io>=3.0.0,<4"]
 
 [project.optional-dependencies]
 # The base install always brings openmassspec-io (the vendor-agnostic Rust
@@ -35,13 +35,13 @@ dependencies = ["openmassspec-io>=2.0.0,<3"]
 # compiled in, so reading and mzML conversion work for all supported
 # formats out of the box. Each extra additionally installs the standalone
 # per-vendor package for direct use.
-thermo = ["opentfraw>=3.1.1,<4"]
-bruker = ["opentimstdf>=3.0.1,<4"]
-waters = ["openwraw>=4.0.2,<5"]
-agilent = ["openaraw>=1.0.0,<2"]
-sciex = ["opensxraw>=0.4.0,<0.5"]
-shimadzu = ["openszraw>=0.3.0,<0.4"]
-all = ["opentfraw>=3.1.1,<4", "opentimstdf>=3.0.1,<4", "openwraw>=4.0.2,<5", "openaraw>=1.0.0,<2", "opensxraw>=0.4.0,<0.5", "openszraw>=0.3.0,<0.4"]
+thermo = ["opentfraw>=4.0.0,<5"]
+bruker = ["opentimstdf>=4.0.0,<5"]
+waters = ["openwraw>=5.0.0,<6"]
+agilent = ["openaraw>=2.0.0,<3"]
+sciex = ["opensxraw>=0.5.0,<0.6"]
+shimadzu = ["openszraw>=0.4.0,<0.5"]
+all = ["opentfraw>=4.0.0,<5", "opentimstdf>=4.0.0,<5", "openwraw>=5.0.0,<6", "openaraw>=2.0.0,<3", "opensxraw>=0.5.0,<0.6", "openszraw>=0.4.0,<0.5"]
 
 [project.urls]
 Homepage = "https://github.com/Sigilweaver/OpenMassSpec"

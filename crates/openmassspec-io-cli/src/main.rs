@@ -15,9 +15,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use openmassspec_core::conformance::assert_iter_invariants;
-use openmassspec_core::{RecordErrorPolicy, SpectrumRecord, WriteSummary};
+use openmassspec_core::{Check, Leniency, RecordErrorPolicy, SpectrumRecord, WriteSummary};
 use openmassspec_io::{
-    collect, collect_centroided, convert_to_mzml_writer, detect_format, ConvertOptions, Detected,
+    collect, collect_centroided_with, convert_to_mzml_writer, detect_format, ConvertOptions,
+    Detected,
 };
 
 #[derive(Parser, Debug)]
@@ -67,9 +68,27 @@ struct ConvertArgs {
     /// Fail at the first spectrum or chromatogram that cannot be decoded
     /// (exit 1; the partial output file is kept and reported as
     /// incomplete). By default unreadable records are left out of the
-    /// output and their count is printed on stderr as a warning.
+    /// output, their count is printed on stderr as a warning, and the
+    /// exit status is 4.
     #[arg(long)]
     strict: bool,
+    /// Let a strict check continue with a warning on the affected record
+    /// instead of failing. Repeatable. Checks: `unknown_scan_mode` (the
+    /// reader did not say whether a spectrum is profile or centroid: it is
+    /// written with no such term, and `--centroid` leaves it unchanged) and
+    /// `dangling_precursor_ref` (a precursor names a spectrum that is not in
+    /// the output: the reference is dropped), `unknown_collision_energy_unit`
+    /// (a collision energy with no unit is written as a unit-less userParam)
+    /// and `spectrum_count_shortfall` (a reader that announced more spectra
+    /// than it yielded ends with a warning and exit 4 instead of an error).
+    #[arg(long = "allow", value_name = "CHECK", value_parser = clap::value_parser!(Check))]
+    allow: Vec<Check>,
+    /// Directory for the writer's spool file (default: the directory of
+    /// the output). Once the encoded spectra pass 64 MiB the writer keeps
+    /// them in a file about as large as the output, so point this at a
+    /// disk with that much space, not at a small or RAM-backed `/tmp`.
+    #[arg(long, value_name = "DIR")]
+    spool_dir: Option<PathBuf>,
     /// Emit timing and record counts on stderr in the chosen format.
     #[arg(long, value_enum)]
     profile: Option<ProfileFormat>,
@@ -96,6 +115,10 @@ struct InfoArgs {
     /// set. Ignored otherwise.
     #[arg(long)]
     centroid_min_intensity: Option<f32>,
+    /// With `--centroid`, let a strict check continue with a warning
+    /// (see `convert --help`). Repeatable.
+    #[arg(long = "allow", value_name = "CHECK", value_parser = clap::value_parser!(Check))]
+    allow: Vec<Check>,
     /// Emit the summary as a single JSON object on stdout.
     #[arg(long)]
     json: bool,
@@ -186,15 +209,18 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
         .with_indexed(args.indexed)
         .with_centroid(args.centroid)
         .with_centroid_min_intensity(args.centroid_min_intensity)
-        .with_record_error_policy(policy);
+        .with_record_error_policy(policy)
+        .with_leniency(leniency(&args.allow));
     // The writer holds encoded spectra until the run is read to the end
     // (so <spectrumList count> is exact), spilling past 64 MiB to a
     // temporary file. Put that file next to the output, where the space
-    // for the result has to exist anyway, not in the system temp dir.
-    let write = opts
-        .write
+    // for the result has to exist anyway, not in the system temp dir,
+    // unless `--spool-dir` says otherwise.
+    let spool_dir = args
+        .spool_dir
         .clone()
-        .with_spool_dir(spool_dir_for(&args.output));
+        .unwrap_or_else(|| spool_dir_for(&args.output));
+    let write = opts.write.clone().with_spool_dir(spool_dir);
     let opts = opts.with_write_options(write);
     let summary = match convert_to_mzml_writer(&detected, &mut writer, &opts) {
         Ok(s) => s,
@@ -209,7 +235,7 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
         eprintln!("  {} is incomplete", args.output.display());
         return ExitCode::from(1);
     }
-    warn_skipped(&summary);
+    let warned = warn_summary(&summary);
     report(
         args.profile,
         &args.output,
@@ -217,7 +243,21 @@ fn run_convert(args: ConvertArgs) -> ExitCode {
         &summary,
         t_start.elapsed().as_secs_f64(),
     );
-    ExitCode::SUCCESS
+    if warned {
+        // The output is written and valid, but records were left out or
+        // could not be reconciled: say so in the exit status too.
+        ExitCode::from(EXIT_INCOMPLETE)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+/// Exit status of `convert` when the output is complete as written but
+/// records were left out or the record count could not be reconciled.
+const EXIT_INCOMPLETE: u8 = 4;
+
+fn leniency(allow: &[Check]) -> Leniency {
+    allow.iter().cloned().collect()
 }
 
 /// Directory for the writer's spool file: the directory of `output`, or
@@ -285,19 +325,48 @@ fn open_writer(path: &Path) -> std::io::Result<OutWriter> {
     }
 }
 
-/// Print the skipped-record warning. Skipping is the default, so the count
-/// must always reach the user.
-fn warn_skipped(summary: &WriteSummary) {
-    if summary.skipped() == 0 {
-        return;
+/// Print every warning the summary carries. Skipping is the default, so
+/// the counts and causes must always reach the user. Returns `true` when
+/// records were left out or the record count did not reconcile.
+fn warn_summary(summary: &WriteSummary) -> bool {
+    let mut incomplete = false;
+    if summary.skipped() > 0 {
+        incomplete = true;
+        eprintln!(
+            "warning: skipped {} record(s) ({} spectra, {} chromatograms; {} spectra and {} \
+             chromatograms were readable but failed the writer's checks)",
+            summary.skipped(),
+            summary.spectra_skipped,
+            summary.chromatograms_skipped,
+            summary.spectra_invalid,
+            summary.chromatograms_invalid
+        );
+        for issue in &summary.issues {
+            let id = issue.record_id.as_deref().unwrap_or("-");
+            eprintln!(
+                "  {:?} #{} ({id}): {}",
+                issue.kind, issue.position, issue.cause
+            );
+        }
+        if summary.issues_truncated > 0 {
+            eprintln!(
+                "  ... and {} more; rerun with --strict to stop at the first one",
+                summary.issues_truncated
+            );
+        }
     }
-    eprintln!(
-        "warning: skipped {} unreadable record(s) ({} spectra, {} chromatograms); \
-         rerun with --strict to stop at the first one and see its error",
-        summary.skipped(),
-        summary.spectra_skipped,
-        summary.chromatograms_skipped
-    );
+    if let Some(m) = &summary.spectrum_count_mismatch {
+        incomplete = true;
+        eprintln!(
+            "warning: the reader announced {} spectra but {} were written or skipped; \
+             spectra may be missing",
+            m.announced, m.accounted
+        );
+    }
+    for (code, n) in &summary.warning_counts {
+        eprintln!("warning: {n} record(s) written with warning '{code}' (see the userParams)");
+    }
+    incomplete
 }
 
 fn report(
@@ -365,7 +434,11 @@ fn run_info(args: InfoArgs) -> ExitCode {
     };
     let t_start = Instant::now();
     let collect_result = if args.centroid {
-        collect_centroided(&detected, args.centroid_min_intensity)
+        collect_centroided_with(
+            &detected,
+            args.centroid_min_intensity,
+            &leniency(&args.allow),
+        )
     } else {
         collect(&detected)
     };
@@ -402,8 +475,13 @@ struct Summary {
     spectrum_count: usize,
     ms_levels: BTreeMap<u32, usize>,
     polarity_counts: BTreeMap<String, usize>,
-    rt_min_sec: f64,
-    rt_max_sec: f64,
+    /// `None` when no spectrum has a retention time.
+    rt_range_sec: Option<(f64, f64)>,
+    spectra_without_rt: usize,
+    /// Checks the format declares it never states (`RunMetadata::unstated`).
+    unstated: Vec<String>,
+    /// Warnings the reader put on the run or on records, by code.
+    warning_counts: BTreeMap<String, usize>,
     decode_elapsed_sec: f64,
 }
 
@@ -425,14 +503,26 @@ impl Summary {
         for (pol, n) in &self.polarity_counts {
             println!("  {pol:>3}:         {n}");
         }
-        if self.spectrum_count > 0 {
+        if let Some((lo, hi)) = self.rt_range_sec {
             println!(
                 "rt range:      {:.3} - {:.3} s ({:.2} - {:.2} min)",
-                self.rt_min_sec,
-                self.rt_max_sec,
-                self.rt_min_sec / 60.0,
-                self.rt_max_sec / 60.0
+                lo,
+                hi,
+                lo / 60.0,
+                hi / 60.0
             );
+        }
+        if self.spectra_without_rt > 0 {
+            println!("no rt:         {}", self.spectra_without_rt);
+        }
+        if !self.unstated.is_empty() {
+            println!(
+                "never stated:  {} (the format cannot say; records written without it are flagged)",
+                self.unstated.join(", ")
+            );
+        }
+        for (code, n) in &self.warning_counts {
+            println!("warning:       {code} x{n}");
         }
         println!("decode time:   {:.2} s", self.decode_elapsed_sec);
     }
@@ -451,13 +541,28 @@ impl Summary {
             .collect::<Vec<_>>()
             .join(",");
         let path_str = self.path.display().to_string();
+        let rt = |v: Option<f64>| v.map_or_else(|| "null".to_string(), |x| format!("{x:.6}"));
+        let unstated = self
+            .unstated
+            .iter()
+            .map(|c| format!("{c:?}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let warnings = self
+            .warning_counts
+            .iter()
+            .map(|(k, v)| format!("{k:?}:{v}"))
+            .collect::<Vec<_>>()
+            .join(",");
         format!(
             "{{\"vendor\":\"{}\",\"path\":{:?},\"instrument\":{:?},\
             \"instrument_accession\":\"{}\",\"source_format\":{:?},\
             \"native_id_format\":{:?},\"software\":{:?},\
             \"spectrum_count\":{},\"ms_levels\":{{{}}},\
-            \"polarity_counts\":{{{}}},\"rt_min_sec\":{:.6},\
-            \"rt_max_sec\":{:.6},\"decode_elapsed_sec\":{:.3}}}",
+            \"polarity_counts\":{{{}}},\"rt_min_sec\":{},\
+            \"rt_max_sec\":{},\"spectra_without_rt\":{},\
+            \"unstated\":[{}],\"warning_counts\":{{{}}},\
+            \"decode_elapsed_sec\":{:.3}}}",
             self.vendor,
             path_str,
             self.instrument,
@@ -468,8 +573,11 @@ impl Summary {
             self.spectrum_count,
             ms,
             pol,
-            self.rt_min_sec,
-            self.rt_max_sec,
+            rt(self.rt_range_sec.map(|r| r.0)),
+            rt(self.rt_range_sec.map(|r| r.1)),
+            self.spectra_without_rt,
+            unstated,
+            warnings,
             self.decode_elapsed_sec,
         )
     }
@@ -485,7 +593,15 @@ fn summarize(
     let mut polarity_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut rt_min = f64::INFINITY;
     let mut rt_max = f64::NEG_INFINITY;
+    let mut spectra_without_rt = 0usize;
+    let mut warning_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for w in &meta.warnings {
+        *warning_counts.entry(w.kind.code().to_string()).or_insert(0) += 1;
+    }
     for r in records {
+        for w in &r.warnings {
+            *warning_counts.entry(w.kind.code().to_string()).or_insert(0) += 1;
+        }
         *ms_levels.entry(r.ms_level).or_insert(0) += 1;
         let key = match r.polarity {
             Some(openmassspec_core::Polarity::Positive) => "pos",
@@ -494,17 +610,14 @@ fn summarize(
             None => "unk",
         };
         *polarity_counts.entry(key.to_string()).or_insert(0) += 1;
-        if r.retention_time_sec < rt_min {
-            rt_min = r.retention_time_sec;
-        }
-        if r.retention_time_sec > rt_max {
-            rt_max = r.retention_time_sec;
+        if let Some(rt) = r.retention_time_sec {
+            rt_min = rt_min.min(rt);
+            rt_max = rt_max.max(rt);
+        } else {
+            spectra_without_rt += 1;
         }
     }
-    if !rt_min.is_finite() {
-        rt_min = 0.0;
-        rt_max = 0.0;
-    }
+    let rt_range_sec = rt_min.is_finite().then_some((rt_min, rt_max));
     Summary {
         vendor: detected.format.name(),
         path: detected.path.clone(),
@@ -522,8 +635,14 @@ fn summarize(
         spectrum_count: records.len(),
         ms_levels,
         polarity_counts,
-        rt_min_sec: rt_min,
-        rt_max_sec: rt_max,
+        rt_range_sec,
+        spectra_without_rt,
+        unstated: meta
+            .unstated
+            .iter()
+            .map(|c| c.as_str().to_string())
+            .collect(),
+        warning_counts,
         decode_elapsed_sec,
     }
 }

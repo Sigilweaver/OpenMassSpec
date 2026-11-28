@@ -1,7 +1,7 @@
 # CI for OpenMassSpec (umbrella).
 #
-# The workspace pulls openmassspec-core, opentfraw, opentimstdf, openwraw,
-# openaraw, and opensxraw from crates.io (registry versions pinned in
+# The workspace pulls openmassspec-core, openmassspec-arrow and the six
+# readers from crates.io (registry versions pinned in
 # Cargo.toml), so only this repo needs to be checked out. The rust and
 # python matrices mirror release.yml/publish.yml's wheel-build matrix
 # (Ubuntu, macOS, Windows) per CI_STANDARDS.md - every OS a wheel/binary
@@ -187,11 +187,12 @@ jobs:
           - macos-latest
           - windows-latest
         python: ["3.12"]
-        # Python 3.9 runs on Ubuntu only. setup-python has no 3.9 on
-        # ubuntu-latest (26.04), so it runs on 24.04.
+        # Python 3.10 (the lowest supported version) runs on Ubuntu only.
+        # setup-python has no 3.10 on ubuntu-latest (26.04), so it runs on
+        # 24.04.
         include:
           - os: ubuntu-24.04
-            python: "3.9"
+            python: "3.10"
     defaults:
       run:
         # windows-latest defaults to pwsh; the steps below rely on POSIX
@@ -238,7 +239,7 @@ jobs:
         if: needs.python-changes.outputs.run == 'true' && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         # Installed from PyPI at the exact versions Cargo.lock resolves, so
         # the native wheels and the readers compiled into openmassspec-io
-        # report the same software_version. Needs each locked version on PyPI.
+        # report the same software_version.
         run: |
           pins=$(python - <<'PY'
           import tomllib

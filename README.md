@@ -60,7 +60,7 @@ The Rust library is on crates.io:
 
 ```toml
 [dependencies]
-openmassspec-io = { version = "2.1", features = ["all"] }
+openmassspec-io = { version = "3.0", features = ["all"] }
 ```
 
 Vendor features are independent (`thermo`, `bruker`, `waters`,
@@ -104,11 +104,26 @@ vendor2mzml convert /data/sample.raw /tmp/sample.mzML --indexed
 Bruker `.d/` and Waters `.raw/` bundles), routes through the matching
 vendor crate, and writes indexed PSI-MS mzML 1.1.0.
 
-A spectrum or chromatogram the reader cannot decode is left out of the
-output, and `convert` prints how many were skipped as a warning on
-stderr; it still exits 0 when the file was written. Pass `--strict` to
-stop at the first unreadable record instead: it exits 1, keeps the
-partial output file, and says on stderr that the file is incomplete.
+A spectrum or chromatogram the reader cannot decode, or that fails the
+writer's checks (mismatched arrays, NaN or infinite values, a duplicate
+native id, ...), is left out of the output. `convert` prints how many were
+skipped and why (the first few causes) on stderr and exits 4; exit 0 means
+nothing was left out. Pass `--strict` to stop at the first such record
+instead: it exits 1, keeps the partial output file, and says on stderr that
+the file is incomplete.
+
+A value a file never states is not guessed. SCIEX `.wiff` files never state
+the scan mode and Agilent Q-TOF scan records never state the collision energy
+unit; their readers declare that, so those files convert with no flag, each
+affected spectrum carries a warning `userParam` (`unknown_scan_mode`,
+`unknown_collision_energy_unit`) and the run carries `unstated_by_source`.
+`--allow CHECK` (repeatable) lets any other file continue past a strict
+check the same way: `unknown_scan_mode`, `unknown_collision_energy_unit`,
+`dangling_precursor_ref` (a precursor names a spectrum that is not in the
+output: the reference is dropped) or `spectrum_count_shortfall`. `convert` prints a count per warning code
+on stderr; warnings do not change the exit status. `--spool-dir DIR` sets
+where the writer keeps encoded spectra once they pass 64 MiB (default: next
+to the output).
 
 ### From Rust
 
@@ -136,7 +151,7 @@ force a new `openmassspec-io` major. A reader failure is
 add that reader crate as a dependency and downcast:
 
 ```rust,ignore
-// Cargo.toml: opentfraw = "3" alongside openmassspec-io.
+// Cargo.toml: opentfraw = "4" alongside openmassspec-io.
 match openmassspec_io::collect(&detected) {
     Ok((records, _meta)) => println!("{} spectra", records.len()),
     Err(err) => {

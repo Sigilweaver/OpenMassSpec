@@ -25,6 +25,15 @@ ordering.
 - Indexed mzML with native-id format `Agilent MassHunter nativeID
   format` (`MS:1002848`).
 
+## Collision energy
+
+Q-TOF MS/MS scan records hold the collision energy as a bare number, and no
+file states its unit. `openaraw` writes the value with no unit and declares
+that the format never states it. `convert` therefore writes the value as a
+unit-less `userParam` on each MS/MS spectrum, with the warning
+`unknown_collision_energy_unit`, and the run with `unstated_by_source`; it
+needs no `--allow`. MRM scans have no collision energy and no warning.
+
 ## Known gaps
 
 - `polarity` and the MS2 `selected_mz` (distinct from the isolation-

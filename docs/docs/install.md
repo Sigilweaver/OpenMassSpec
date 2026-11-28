@@ -29,7 +29,7 @@ cargo build --release -p openmassspec-io-cli
 ## Python (PyPI)
 
 The Python bindings are distributed as `openmassspec-io`. Wheels are
-abi3-py39, so a single wheel covers Python 3.9 and newer.
+abi3-py310, so a single wheel covers Python 3.10 and newer.
 
 ```sh
 pip install openmassspec-io          # core

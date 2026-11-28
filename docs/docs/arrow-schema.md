@@ -8,6 +8,10 @@ columns; an MS1 spectrum has all `precursor_*` columns null. The
 schema is part of this crate's stable public surface: any column
 addition is a minor-version bump, any removal or rename is breaking.
 
+The schema metadata carries `openmassspec.schema_version` (1 in 4.0). A
+reader accepts versions up to its own and rejects a file with no version key,
+which includes every file written by the 3.x crate.
+
 ## Schema (flat)
 
 | Column                       | Arrow type              | Notes                                                                 |
@@ -20,7 +24,7 @@ addition is a minor-version bump, any removal or rename is breaking.
 | `scan_mode`                   | `Utf8`, nullable         | `"profile"` / `"centroid"`.                                          |
 | `analyzer`                    | `Utf8`, nullable         | `"itms"`, `"tqms"`, `"sqms"`, `"tof"`, `"ftms"`, `"sector"`.          |
 | `filter`                      | `Utf8`, nullable         | Thermo-style scan filter string, when the vendor populates one.       |
-| `retention_time_sec`          | `Float64`                | Seconds.                                                              |
+| `retention_time_sec`          | `Float64`, nullable      | Seconds; null when the reader could not state one.                    |
 | `total_ion_current`           | `Float64`, nullable      | Vendor-declared TIC, when present.                                    |
 | `base_peak_mz`                | `Float64`, nullable      | Vendor-declared base-peak m/z, when present.                          |
 | `base_peak_intensity`         | `Float64`, nullable      | Vendor-declared base-peak intensity, when present.                    |
@@ -34,8 +38,8 @@ addition is a minor-version bump, any removal or rename is breaking.
 | `precursor_isolation_width`   | `Float64`, nullable      | Total isolation width in m/z.                                         |
 | `precursor_charge`            | `Int32`, nullable        | Null when not assigned.                                              |
 | `precursor_intensity`         | `Float64`, nullable      |                                                                        |
-| `precursor_collision_energy`  | `Float64`, nullable      | Interpretation depends on `precursor_ce_is_nce`.                       |
-| `precursor_ce_is_nce`         | `UInt8`, nullable        | `1` if `precursor_collision_energy` is normalized (NCE %), else `0`.  |
+| `precursor_collision_energy`  | `Float64`, nullable      | The first collision energy; see `precursor_collision_energy_unit`.     |
+| `precursor_collision_energy_unit` | `Utf8`, nullable     | `"ev"` or `"nce"`; null when the file gives a value and does not say what it is. |
 | `precursor_native_id`         | `Utf8`, nullable         | Native id of the precursor scan, when known.                          |
 | `precursor_activation`        | `Utf8`, nullable         | `"cid"`, `"hcd"`, `"etd"`, `"ecd"`, `"uvpd"`, `"pqd"`, `"pd"`, `"sid"`, `"ethcd"`, `"irmpd"`, `"mpid"`. |
 | `precursor_analyzer`          | `Utf8`, nullable         | Analyzer that recorded the precursor scan; same value set as `analyzer`. |
@@ -46,6 +50,9 @@ addition is a minor-version bump, any removal or rename is breaking.
 | `mobility_array_kind`         | `Utf8`, nullable         | `"inverse_reduced_k0"` / `"drift_time_ms"`; interpretation of `inv_mobility_per_peak` for every row in the batch. |
 | `acquisition_event_id`        | `UInt32`, nullable       | Native acquisition event or grouping number, when decoded.          |
 | `extra`                       | `Map<Utf8, Utf8>`        | Namespaced vendor values from `SpectrumRecord.extra`; empty when none are present. |
+| `precursor_collision_energies` | `LargeList<Struct{value: Float64, unit: Utf8 nullable}>`, nullable | Every collision energy of the precursor, one entry per step. |
+| `scan_windows`                | `LargeList<Struct{lower: Float64, upper: Float64}>` | The instrument's acquisition ranges; empty when the reader does not state one. |
+| `warnings`                    | `LargeList<Struct{code: Utf8, message: Utf8}>` | Per-record warnings, for example `empty_spectrum`, `unknown_scan_mode`, `unknown_collision_energy_unit`. Empty when none. |
 
 `SpectrumBatchBuilder::new(Option<MobilityArrayKind>)` sets the
 `mobility_array_kind` value shared by every row in the batch. Pass
@@ -55,14 +62,14 @@ and `mobility_array_kind` stay null for every row).
 ## Building a batch
 
 ```rust,no_run
-use openmassspec_arrow::{spectrum_record_schema, SpectrumBatchBuilder};
+use openmassspec_arrow::arrow_60::{spectrum_record_schema, SpectrumBatchBuilder};
 use openmassspec_core::{MobilityArrayKind, SpectrumSource};
 use opentimstdf::mzml::TdfSource;
 
 let mut src = TdfSource::open("sample.d")?;
 let mut b = SpectrumBatchBuilder::new(Some(MobilityArrayKind::InverseReducedVsPerCm2));
 for s in src.iter_spectra() {
-    b.push(&s?);
+    b.push(&s?)?;
 }
 let batch = b.finish()?;
 assert_eq!(batch.schema(), spectrum_record_schema());

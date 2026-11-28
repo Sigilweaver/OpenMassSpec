@@ -40,6 +40,11 @@ stream layout, never from the filename alone - so a single
 - PDA/UV chromatogram streams (`PDA 3D Raw Data`, `LSS Raw Data`) are
   not decoded or exposed - see [OpenSZRaw issue
   #2](https://github.com/Sigilweaver/OpenSZRaw/issues/2).
+- IT-TOF peaks at or below the calibration intercept have no m/z. They are
+  left out of the spectrum, counted in `extra`, and the spectrum carries the
+  warning `openszraw.uncalibrated_peaks_dropped`. Single-quad peaks that are
+  out of m/z order are sorted with their intensities
+  (`openszraw.mz_reordered`).
 - IT-TOF per-channel polarity/MS-level and QTOF MS2 precursor m/z are
   not yet resolved. See [OpenSZRaw's known-limitations
   doc](https://github.com/Sigilweaver/OpenSZRaw/blob/main/docs/format/06-known-limitations.md)

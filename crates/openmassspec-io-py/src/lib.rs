@@ -32,8 +32,8 @@ use std::path::{Path, PathBuf};
 
 use numpy::PyArray1;
 use openmassspec_core::{
-    Activation, Analyzer, ChromatogramRecord, CvTerm, MobilityArrayKind, Polarity, PrecursorInfo,
-    RecordErrorPolicy, SpectrumRecord,
+    Activation, Analyzer, Check, ChromatogramRecord, CvTerm, Leniency, MobilityArrayKind, Polarity,
+    PrecursorInfo, RecordErrorPolicy, SpectrumRecord,
 };
 use openmassspec_io::{detect_format, ConvertOptions, Detected};
 use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError, PyValueError};
@@ -59,6 +59,18 @@ fn detected_or_err(path: &Path) -> PyResult<Detected> {
     })
 }
 
+/// Build a [`Leniency`] from check names; an unknown name is a
+/// `ValueError` listing the valid ones.
+fn leniency_from(allow: Vec<String>) -> PyResult<Leniency> {
+    allow
+        .iter()
+        .map(|name| {
+            name.parse::<Check>()
+                .map_err(|e| PyValueError::new_err(e.to_string()))
+        })
+        .collect()
+}
+
 fn map_err<E: std::fmt::Display>(e: E) -> PyErr {
     PyRuntimeError::new_err(e.to_string())
 }
@@ -68,32 +80,11 @@ fn polarity_str(p: Polarity) -> &'static str {
 }
 
 fn activation_str(a: Activation) -> &'static str {
-    match a {
-        Activation::HCD => "hcd",
-        Activation::MPID => "mpid",
-        Activation::ETD => "etd",
-        Activation::CID => "cid",
-        Activation::ECD => "ecd",
-        Activation::IRMPD => "irmpd",
-        Activation::PD => "pd",
-        Activation::PQD => "pqd",
-        Activation::UVPD => "uvpd",
-        Activation::SID => "sid",
-        Activation::EThcD => "ethcd",
-        other => other.as_str(),
-    }
+    a.as_str()
 }
 
 fn analyzer_str(a: Analyzer) -> &'static str {
-    match a {
-        Analyzer::ITMS => "itms",
-        Analyzer::TQMS => "tqms",
-        Analyzer::SQMS => "sqms",
-        Analyzer::TOFMS => "tofms",
-        Analyzer::FTMS => "ftms",
-        Analyzer::Sector => "sector",
-        other => other.as_str(),
-    }
+    a.as_str()
 }
 
 fn mobility_kind_str(k: MobilityArrayKind) -> &'static str {
@@ -168,7 +159,7 @@ impl Spectrum {
         self.rec_ref().map(|r| r.ms_level)
     }
     #[getter]
-    fn retention_time_sec(&self) -> PyResult<f64> {
+    fn retention_time_sec(&self) -> PyResult<Option<f64>> {
         self.rec_ref().map(|r| r.retention_time_sec)
     }
     #[getter]
@@ -240,6 +231,17 @@ impl Spectrum {
     fn extra(&self) -> PyResult<std::collections::BTreeMap<String, String>> {
         self.rec_ref().map(|r| r.extra.clone())
     }
+    /// Warnings the reader put on this spectrum, as a list of
+    /// `{"code": ..., "message": ...}` dicts (empty when none). Codes include
+    /// `empty_spectrum` (no peaks) and reader-specific ones such as
+    /// `opentfraw.charge_without_selected_mz`. The warnings `to_mzml` adds
+    /// while writing (`unknown_scan_mode`, `unknown_collision_energy_unit`,
+    /// `centroid_not_applied`) are in its `warning_counts` and the mzML, not
+    /// here.
+    #[getter]
+    fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyList>> {
+        warnings_to_list(py, &self.rec_ref()?.warnings)
+    }
 
     /// NumPy array over the m/z values. The first access moves the values
     /// into NumPy without copying; later accesses return the same array.
@@ -292,8 +294,13 @@ impl Spectrum {
     fn __repr__(&self) -> PyResult<String> {
         let r = self.rec_ref()?;
         Ok(format!(
-            "<Spectrum index={} ms_level={} native_id={:?} rt_sec={:.3} n_peaks={}>",
-            r.index, r.ms_level, r.native_id, r.retention_time_sec, self.derived.n_peaks
+            "<Spectrum index={} ms_level={} native_id={:?} rt_sec={} n_peaks={}>",
+            r.index,
+            r.ms_level,
+            r.native_id,
+            r.retention_time_sec
+                .map_or_else(|| "None".to_string(), |rt| format!("{rt:.3}")),
+            self.derived.n_peaks
         ))
     }
 }
@@ -304,6 +311,20 @@ impl Spectrum {
     }
 }
 
+fn warnings_to_list<'py>(
+    py: Python<'py>,
+    warnings: &[openmassspec_core::Warning],
+) -> PyResult<Bound<'py, pyo3::types::PyList>> {
+    let list = pyo3::types::PyList::empty(py);
+    for w in warnings {
+        let item = PyDict::new(py);
+        item.set_item("code", w.kind.code())?;
+        item.set_item("message", w.message.as_str())?;
+        list.append(item)?;
+    }
+    Ok(list)
+}
+
 fn precursor_to_dict<'py>(py: Python<'py>, p: &PrecursorInfo) -> PyResult<Bound<'py, PyDict>> {
     let d = PyDict::new(py);
     d.set_item("target_mz", p.target_mz)?;
@@ -311,8 +332,19 @@ fn precursor_to_dict<'py>(py: Python<'py>, p: &PrecursorInfo) -> PyResult<Bound<
     d.set_item("isolation_width", p.isolation_width)?;
     d.set_item("charge", p.charge)?;
     d.set_item("intensity", p.intensity)?;
-    d.set_item("collision_energy", p.collision_energy)?;
-    d.set_item("ce_is_nce", p.ce_is_nce)?;
+    // Every collision energy with its unit (`None` when the file does not
+    // state it), as the standalone readers' dicts have it.
+    let energies = pyo3::types::PyList::empty(py);
+    for ce in &p.collision_energies {
+        let item = PyDict::new(py);
+        item.set_item("value", ce.value)?;
+        item.set_item(
+            "unit",
+            ce.unit.map(openmassspec_core::CollisionEnergyUnit::as_str),
+        )?;
+        energies.append(item)?;
+    }
+    d.set_item("collision_energies", energies)?;
     d.set_item("precursor_native_id", p.precursor_native_id.clone())?;
     d.set_item("activation", p.activation.map(activation_str))?;
     d.set_item("analyzer", p.analyzer.map(analyzer_str))?;
@@ -403,6 +435,25 @@ impl RunInfo {
     fn extra(&self) -> std::collections::BTreeMap<String, String> {
         self.meta.extra.clone()
     }
+    /// Checks the format declares it never states: `"unknown_scan_mode"`
+    /// (every file of the format leaves out whether a spectrum is profile or
+    /// centroid) and `"unknown_collision_energy_unit"` (collision energies
+    /// are bare numbers). `to_mzml` and the CLI convert such files without
+    /// `allow=`, and flag each affected record and the run
+    /// (`unstated_by_source`). Empty for readers that state both.
+    #[getter]
+    fn unstated(&self) -> Vec<String> {
+        self.meta
+            .unstated
+            .iter()
+            .map(|c| c.as_str().to_string())
+            .collect()
+    }
+    /// Run-level warnings, as `{"code": ..., "message": ...}` dicts.
+    #[getter]
+    fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyList>> {
+        warnings_to_list(py, &self.meta.warnings)
+    }
     fn __repr__(&self) -> String {
         format!(
             "<RunInfo instrument='{}' source='{}' software='{} {}'>",
@@ -490,7 +541,12 @@ struct SpectrumIter {
 }
 
 impl SpectrumIter {
-    fn spawn(detected: Detected, centroid: bool, min_intensity: Option<f32>) -> Self {
+    fn spawn(
+        detected: Detected,
+        centroid: bool,
+        min_intensity: Option<f32>,
+        leniency: Leniency,
+    ) -> Self {
         let (tx, rx) = std::sync::mpsc::sync_channel::<StreamMsg>(1);
         let handle = std::thread::spawn(move || {
             let send_rec = |tx: &std::sync::mpsc::SyncSender<StreamMsg>, rec: SpectrumRecord| {
@@ -501,9 +557,12 @@ impl SpectrumIter {
                 }
             };
             let result = if centroid {
-                openmassspec_io::stream_centroided(&detected, min_intensity, |rec| {
-                    send_rec(&tx, rec)
-                })
+                openmassspec_io::stream_centroided_with(
+                    &detected,
+                    min_intensity,
+                    &leniency,
+                    |rec| send_rec(&tx, rec),
+                )
             } else {
                 openmassspec_io::stream(&detected, |rec| send_rec(&tx, rec))
             };
@@ -574,10 +633,33 @@ fn detect(path: PathBuf) -> Option<&'static str> {
 /// reports how many were skipped. With `skip_unreadable=False` the first
 /// one raises `RuntimeError`.
 ///
+/// Strict checks fail by default. `allow` names the ones that may continue
+/// with a warning on the affected record instead: `"unknown_scan_mode"`
+/// (the reader did not say whether a spectrum is profile or centroid: it is
+/// written with no such term, and `centroid` leaves it unchanged),
+/// `"dangling_precursor_ref"` (a precursor names a spectrum that is not in
+/// the output: the reference is dropped), `"unknown_collision_energy_unit"`
+/// (a collision energy with no unit is written as a unit-less userParam) and
+/// `"spectrum_count_shortfall"` (a reader that announced more spectra than it
+/// yielded ends with a warning instead of an error). An unknown name raises
+/// `ValueError`.
+///
 /// Returns a dict with `spectra_written`, `spectra_skipped`,
-/// `chromatograms_written`, and `chromatograms_skipped`.
+/// `spectra_invalid` (skipped because the writer rejected them),
+/// `chromatograms_written`, `chromatograms_skipped`,
+/// `chromatograms_invalid`, `warning_counts` (records written per warning
+/// code), `issues` (the causes of the first skipped records, as
+/// `{kind, position, record_id, cause}` dicts), `issues_truncated`, and
+/// `spectrum_count_mismatch` (`None`, or `(announced, accounted_for)`).
+/// Anything that left records out, flagged one, or could not be reconciled
+/// also raises a `RuntimeWarning`.
+///
+/// `spool_dir` is where the writer keeps encoded spectra once they pass
+/// 64 MiB (a file about as large as the output). It defaults to the
+/// directory of `output`.
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
-#[pyo3(signature = (input, output, *, indexed = true, centroid = false, centroid_min_intensity = None, skip_unreadable = true))]
+#[pyo3(signature = (input, output, *, indexed = true, centroid = false, centroid_min_intensity = None, skip_unreadable = true, allow = None, spool_dir = None))]
 fn to_mzml<'py>(
     py: Python<'py>,
     input: PathBuf,
@@ -586,6 +668,8 @@ fn to_mzml<'py>(
     centroid: bool,
     centroid_min_intensity: Option<f32>,
     skip_unreadable: bool,
+    allow: Option<Vec<String>>,
+    spool_dir: Option<PathBuf>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let detected = detected_or_err(&input)?;
     let policy = if skip_unreadable {
@@ -597,19 +681,51 @@ fn to_mzml<'py>(
         .with_indexed(indexed)
         .with_centroid(centroid)
         .with_centroid_min_intensity(centroid_min_intensity)
-        .with_record_error_policy(policy);
+        .with_record_error_policy(policy)
+        .with_leniency(leniency_from(allow.unwrap_or_default())?);
+    // The writer keeps encoded spectra in a spool file once they pass
+    // 64 MiB, about as large as the output. Default to the output's
+    // directory, where that space has to exist anyway, not the system
+    // temp dir (often a small or RAM-backed tmpfs).
+    let spool_dir = spool_dir.unwrap_or_else(|| match output.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),
+        _ => PathBuf::from("."),
+    });
+    let write = opts.write.clone().with_spool_dir(spool_dir);
+    let opts = opts.with_write_options(write);
     let summary = py
         .detach(|| openmassspec_io::convert_to_mzml(&detected, &output, &opts))
         .map_err(map_err)?;
+    let mut warnings = Vec::new();
     if summary.skipped() > 0 {
-        let msg = format!(
-            "skipped {} unreadable record(s) ({} spectra, {} chromatograms) while writing {}; \
+        warnings.push(format!(
+            "skipped {} record(s) ({} spectra, {} chromatograms; {} spectra and {} \
+             chromatograms were readable but failed the writer's checks) while writing {}; \
              pass skip_unreadable=False to raise at the first one",
             summary.skipped(),
             summary.spectra_skipped,
             summary.chromatograms_skipped,
+            summary.spectra_invalid,
+            summary.chromatograms_invalid,
             output.display()
-        );
+        ));
+    }
+    for (code, n) in &summary.warning_counts {
+        warnings.push(format!(
+            "{n} record(s) written to {} with warning '{code}'",
+            output.display()
+        ));
+    }
+    if let Some(m) = &summary.spectrum_count_mismatch {
+        warnings.push(format!(
+            "the reader announced {} spectra but {} were written or skipped for {}; \
+             spectra may be missing",
+            m.announced,
+            m.accounted,
+            output.display()
+        ));
+    }
+    for msg in warnings {
         let msg = std::ffi::CString::new(msg).map_err(map_err)?;
         PyErr::warn(
             py,
@@ -621,8 +737,32 @@ fn to_mzml<'py>(
     let d = PyDict::new(py);
     d.set_item("spectra_written", summary.spectra_written)?;
     d.set_item("spectra_skipped", summary.spectra_skipped)?;
+    d.set_item("spectra_invalid", summary.spectra_invalid)?;
     d.set_item("chromatograms_written", summary.chromatograms_written)?;
     d.set_item("chromatograms_skipped", summary.chromatograms_skipped)?;
+    d.set_item("chromatograms_invalid", summary.chromatograms_invalid)?;
+    let counts = PyDict::new(py);
+    for (code, n) in &summary.warning_counts {
+        counts.set_item(code, n)?;
+    }
+    d.set_item("warning_counts", counts)?;
+    let issues = pyo3::types::PyList::empty(py);
+    for issue in &summary.issues {
+        let item = PyDict::new(py);
+        item.set_item("kind", format!("{:?}", issue.kind).to_lowercase())?;
+        item.set_item("position", issue.position)?;
+        item.set_item("record_id", issue.record_id.clone())?;
+        item.set_item("cause", issue.cause.clone())?;
+        issues.append(item)?;
+    }
+    d.set_item("issues", issues)?;
+    d.set_item("issues_truncated", summary.issues_truncated)?;
+    d.set_item(
+        "spectrum_count_mismatch",
+        summary
+            .spectrum_count_mismatch
+            .map(|m| (m.announced, m.accounted)),
+    )?;
     Ok(d)
 }
 
@@ -675,17 +815,23 @@ fn read_chromatograms(py: Python<'_>, path: PathBuf) -> PyResult<Vec<Chromatogra
 /// background thread and handed across one at a time, so memory is bounded
 /// by a single in-flight spectrum rather than the whole run.
 #[pyfunction]
-#[pyo3(signature = (path, *, centroid = false, centroid_min_intensity = None))]
+#[pyo3(signature = (path, *, centroid = false, centroid_min_intensity = None, allow = None))]
 fn iter_spectra(
     py: Python<'_>,
     path: PathBuf,
     centroid: bool,
     centroid_min_intensity: Option<f32>,
+    allow: Option<Vec<String>>,
 ) -> PyResult<Py<SpectrumIter>> {
     let detected = detected_or_err(&path)?;
     Py::new(
         py,
-        SpectrumIter::spawn(detected, centroid, centroid_min_intensity),
+        SpectrumIter::spawn(
+            detected,
+            centroid,
+            centroid_min_intensity,
+            leniency_from(allow.unwrap_or_default())?,
+        ),
     )
 }
 
@@ -698,7 +844,7 @@ mod arrow_bridge {
     use super::*;
     use arrow::pyarrow::ToPyArrow;
     use arrow::record_batch::RecordBatch;
-    use openmassspec_io::arrow::SpectrumBatchBuilder;
+    use openmassspec_io::arrow::arrow_60::SpectrumBatchBuilder;
     use std::sync::{
         mpsc::{sync_channel, Receiver, SyncSender},
         Mutex,
@@ -752,18 +898,20 @@ mod arrow_bridge {
     /// Build a `pyarrow.RecordBatchReader` over every spectrum in the
     /// acquisition, batched at `batch_size` rows (default 1024).
     #[pyfunction]
-    #[pyo3(signature = (path, *, batch_size = 1024, centroid = false, centroid_min_intensity = None))]
+    #[pyo3(signature = (path, *, batch_size = 1024, centroid = false, centroid_min_intensity = None, allow = None))]
     pub(super) fn read_arrow<'py>(
         py: Python<'py>,
         path: PathBuf,
         batch_size: usize,
         centroid: bool,
         centroid_min_intensity: Option<f32>,
+        allow: Option<Vec<String>>,
     ) -> PyResult<Bound<'py, PyAny>> {
         if batch_size == 0 {
             return Err(PyValueError::new_err("batch_size must be > 0"));
         }
         let detected = detected_or_err(&path)?;
+        let leniency = leniency_from(allow.unwrap_or_default())?;
         // Metadata (including the mobility array kind the batch builder
         // needs) is available as soon as the source is opened, so it does
         // not require decoding any spectra.
@@ -771,7 +919,7 @@ mod arrow_bridge {
             .detach(|| openmassspec_io::metadata_only(&detected))
             .map_err(map_err)?;
         let mobility_kind = meta.mobility_array_kind;
-        let schema = openmassspec_io::arrow::spectrum_record_schema();
+        let schema = openmassspec_io::arrow::arrow_60::spectrum_record_schema();
         let pa = py.import("pyarrow")?;
         let py_schema = schema.to_pyarrow(py)?;
         let (sender, receiver) = sync_channel(2);
@@ -787,6 +935,7 @@ mod arrow_bridge {
                 detected,
                 centroid,
                 centroid_min_intensity,
+                leniency,
                 batch_size,
                 mobility_kind,
                 &sender,
@@ -804,6 +953,7 @@ mod arrow_bridge {
         detected: Detected,
         centroid: bool,
         min_intensity: Option<f32>,
+        leniency: Leniency,
         batch_size: usize,
         mobility_kind: Option<openmassspec_core::MobilityArrayKind>,
         sender: &SyncSender<ArrowMsg>,
@@ -814,18 +964,19 @@ mod arrow_bridge {
         // Arrow batch-finish failure isn't one of that enum's variants, so
         // it's stashed here and `Cancelled` is used to stop iteration, then
         // surfaced below once streaming has returned.
-        let mut arrow_err: Option<::arrow::error::ArrowError> = None;
+        let mut arrow_err: Option<openmassspec_io::arrow::arrow_60::BatchError> = None;
 
         let on_spectrum = |rec: SpectrumRecord| -> openmassspec_io::Result<()> {
-            builder.push(&rec);
+            if let Err(e) = builder.push(&rec) {
+                arrow_err = Some(e);
+                return Err(openmassspec_io::Error::Cancelled);
+            }
             n += 1;
             if n == batch_size {
-                // `finish` consumes `self`, so swap in a fresh builder
-                // rather than moving `builder` out of this `FnMut`'s
-                // captured environment.
-                let finished =
-                    std::mem::replace(&mut builder, SpectrumBatchBuilder::new(mobility_kind));
-                match finished.finish() {
+                // `finish_batch` keeps the builder, and with it the native
+                // ids seen so far, so a duplicate id in a later batch is
+                // still caught.
+                match builder.finish_batch() {
                     Ok(b) => {
                         sender
                             .send(ArrowMsg::Batch(b))
@@ -842,7 +993,12 @@ mod arrow_bridge {
         };
 
         let stream_result = if centroid {
-            openmassspec_io::stream_centroided(&detected, min_intensity, on_spectrum)
+            openmassspec_io::stream_centroided_with(
+                &detected,
+                min_intensity,
+                &leniency,
+                on_spectrum,
+            )
         } else {
             openmassspec_io::stream(&detected, on_spectrum)
         };

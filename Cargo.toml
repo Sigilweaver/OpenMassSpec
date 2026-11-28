@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "2.1.2"
+version = "3.0.0"
 edition = "2021"
 rust-version = "1.95"
 authors = ["Nathan Riley <git@nathanriley.com>"]
@@ -17,14 +17,14 @@ homepage = "https://sigilweaver.app/openmassspec/"
 documentation = "https://sigilweaver.app/openmassspec/docs/"
 
 [workspace.dependencies]
-openmassspec-core = "3.0.0"
-openmassspec-arrow = "3.0.0"
-opentfraw = "3.1.1"
-opentimstdf = "3.0.1"
-openwraw = "4.0.2"
-openaraw = "1.0.0"
-opensxraw = "0.4.0"
-openszraw = "0.3.0"
+openmassspec-core = "4.0.0"
+openmassspec-arrow = "4.0.0"
+opentfraw = "4.0.0"
+opentimstdf = "4.0.0"
+openwraw = "5.0.0"
+openaraw = "2.0.0"
+opensxraw = "0.5.0"
+openszraw = "0.4.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -20,7 +20,7 @@ use mzdata::spectrum::bindata::ArrayRetrievalError;
 use mzdata::spectrum::{IsolationWindowState, RawSpectrum, ScanPolarity};
 use mzdata::MzMLReader;
 
-use openmassspec_core::{Polarity, PrecursorInfo, SpectrumRecord};
+use openmassspec_core::{Polarity, PrecursorInfo, SpectrumRecord, Warning, WarningKind};
 
 /// Returns true if `path` has an extension suggesting an mzML file.
 /// Accepts `.mzml`, `.mzML`, and `.mzml.gz` (any case).
@@ -380,14 +380,22 @@ fn spectrum_to_record(
             .with_precursor_native_id(p.precursor_id.clone())
     });
 
-    Ok(
-        SpectrumRecord::new(s.index(), stream_index as u32 + 1, native_id)
-            .with_ms_level(ms_level)
-            .with_polarity(polarity)
-            .with_retention_time_sec(rt_sec)
-            .with_precursor(precursor)
-            .with_peaks(mz, intensity),
-    )
+    let empty = mz.is_empty();
+    let mut record = SpectrumRecord::new(s.index(), stream_index as u32 + 1, native_id)
+        .with_ms_level(ms_level)
+        .with_polarity(polarity)
+        .with_retention_time_sec(rt_sec)
+        .with_precursor(precursor)
+        .with_peaks(mz, intensity);
+    if empty {
+        // Core's harness requires the flag on every spectrum with no peaks,
+        // and mzML from other tools does not carry it.
+        record = record.with_warning(Warning::new(
+            WarningKind::EmptySpectrum,
+            "the mzML spectrum has no peaks",
+        ));
+    }
+    Ok(record)
 }
 
 #[cfg(test)]

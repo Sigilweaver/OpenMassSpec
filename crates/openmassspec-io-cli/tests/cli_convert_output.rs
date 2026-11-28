@@ -144,3 +144,135 @@ fn unreadable_input_is_reported_as_an_io_error() {
     assert_io_error(&convert, "convert");
     assert_io_error(&info, "info");
 }
+
+fn sciex_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/sciex/PXD022088/Rcor2KOESC1.wiff")
+}
+
+fn agilent_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/agilent/180814-Sample19.d")
+}
+
+/// A format that never states the scan mode converts with no `--allow`:
+/// exit 0, a warning count per code on stderr, and `info` names what the
+/// format cannot state.
+#[test]
+fn sciex_converts_without_allow_and_says_what_it_cannot_state() {
+    let input = sciex_fixture();
+    if skip_missing(&input) {
+        return;
+    }
+    let dir = scratch_dir("sciex-unstated");
+    let out = dir.join("out.mzML");
+    let o = run(&["convert".as_ref(), input.as_os_str(), out.as_os_str()]);
+    let stderr = String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(0), "{stderr}");
+    assert!(
+        stderr.contains("with warning 'unknown_scan_mode'"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("with warning 'unstated_by_source'"),
+        "{stderr}"
+    );
+    let text = std::fs::read_to_string(&out).expect("read output");
+    assert!(text.contains("openmassspec: warning unstated_by_source"));
+
+    let info = run(&["info".as_ref(), input.as_os_str()]);
+    assert!(info.status.success());
+    let stdout = String::from_utf8_lossy(&info.stdout);
+    assert!(
+        stdout.contains("never stated:  unknown_scan_mode"),
+        "{stdout}"
+    );
+    let json = run(&["info".as_ref(), "--json".as_ref(), input.as_os_str()]);
+    let stdout = String::from_utf8_lossy(&json.stdout);
+    assert!(
+        stdout.contains("\"unstated\":[\"unknown_scan_mode\"]"),
+        "{stdout}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn agilent_converts_without_allow_and_flags_the_unit() {
+    let input = agilent_fixture();
+    if skip_missing(&input) {
+        return;
+    }
+    let dir = scratch_dir("agilent-unstated");
+    let out = dir.join("out.mzML");
+    let o = run(&["convert".as_ref(), input.as_os_str(), out.as_os_str()]);
+    let stderr = String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(0), "{stderr}");
+    assert!(
+        stderr.contains("with warning 'unknown_collision_energy_unit'"),
+        "{stderr}"
+    );
+    // The same file with the check named explicitly is accepted too.
+    let o = run(&[
+        "convert".as_ref(),
+        "--allow".as_ref(),
+        "unknown_collision_energy_unit".as_ref(),
+        input.as_os_str(),
+        out.as_os_str(),
+    ]);
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// An unknown check name is a usage error that lists the valid ones, not a
+/// silently ignored flag.
+#[test]
+fn allow_rejects_an_unknown_check_name() {
+    let dir = scratch_dir("bad-allow");
+    let o = run(&[
+        "convert".as_ref(),
+        "--allow".as_ref(),
+        "no_such_check".as_ref(),
+        "in.raw".as_ref(),
+        dir.join("out.mzML").as_os_str(),
+    ]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&o.stderr).contains("no_such_check"),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// `--spool-dir` is used: a directory that does not exist stops a
+/// conversion large enough to spill.
+#[test]
+fn spool_dir_option_is_accepted() {
+    let input = thermo_fixture();
+    if skip_missing(&input) {
+        return;
+    }
+    let dir = scratch_dir("spool-opt");
+    let out = dir.join("out.mzML");
+    let spool = dir.join("spool");
+    std::fs::create_dir(&spool).expect("create spool dir");
+    let o = run(&[
+        "convert".as_ref(),
+        "--spool-dir".as_ref(),
+        spool.as_os_str(),
+        input.as_os_str(),
+        out.as_os_str(),
+    ]);
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let left: Vec<_> = std::fs::read_dir(&spool).expect("read spool dir").collect();
+    assert!(left.is_empty(), "spool file left behind: {left:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -25,6 +25,11 @@ A path is treated as Thermo when:
 
 - Some experimental scan modes (SIM, MRM with non-linear quad) are
   exposed as plain `SpectrumRecord` without specialized CV terms.
+- A collision energy whose unit the method does not state, or states more
+  than one way, has no unit (public example: PXD061791, Orbitrap Ascend).
+  `convert` skips those spectra and exits 4 unless
+  `--allow unknown_collision_energy_unit` writes them with a unit-less
+  collision energy and a warning.
 - The `software` element in mzML reports `opentfraw <version>`
   rather than `Xcalibur`. This is intentional: it identifies the tool
   that actually wrote the file.

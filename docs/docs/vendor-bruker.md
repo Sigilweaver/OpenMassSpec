@@ -25,6 +25,10 @@ A path is treated as Bruker when:
 - MALDI / imaging acquisitions (`MaldiFrameInfo`-based) are out of
   scope for the mzML writer in 0.x; the data is reachable via the
   lower-level `opentimstdf` API.
+- The scan window is the stated `MzAcqRangeLower`/`Upper`, which the peaks
+  can exceed by about 5 m/z on `otofControl` acquisitions. It is written as
+  stored. Spectra with no peaks carry the warning `empty_spectrum` and no
+  base peak or m/z range.
 - IMS-MS quadrupole-window calibration is reported but not validated
   against vendor-side calibration curves.
 

@@ -16,31 +16,38 @@ this contract.
 | `PrecursorInfo` | `Spectrum.precursor` | Dictionary, or `None` for spectra without a precursor. |
 | `RunMetadata` | `run_info(path)` | One `RunInfo`; CV terms are `{accession, name}` dictionaries. |
 | `ChromatogramRecord` | `read_chromatograms(path)` | `Chromatogram` objects with NumPy float32 time and intensity arrays. |
-| `SpectrumRecord` in Arrow | `read_arrow(path)` | 34 columns, including `acquisition_event_id` and `extra`. |
+| `SpectrumRecord` in Arrow | `read_arrow(path)` | 37 columns, including `acquisition_event_id`, `extra`, `precursor_collision_energies`, `scan_windows` and `warnings`. The schema carries a version; 3.x Arrow files are rejected. |
 
 `Spectrum` exposes `index`, `scan_number`, `native_id`, `ms_level`,
 `polarity`, `scan_mode`, `analyzer`, `acquisition_event_id`, `filter`,
 `retention_time_sec`, `low_mz`, `high_mz`, `ion_injection_time_ms`,
 `inv_mobility`, `faims_cv`, `precursor`, `mz`, `intensity`,
-`inv_mobility_per_peak`, and `extra`. `reported_total_ion_current`,
+`inv_mobility_per_peak`, `extra`, and `warnings` (the reader's warnings, a list of
+`{"code", "message"}` dictionaries). `retention_time_sec` is `None` when the
+reader could not state one. `reported_total_ion_current`,
 `reported_base_peak_mz`, and `reported_base_peak_intensity` preserve the
 nullable source values. The existing `total_ion_current`, `base_peak_mz`,
 and `base_peak_intensity` properties compute a fallback from peaks when the
 source value is absent.
 
 `precursor` contains `target_mz`, `selected_mz`, `isolation_width`,
-`charge`, `intensity`, `collision_energy`, `ce_is_nce`,
-`precursor_native_id`, `activation`, `analyzer`, and `ccs`.
+`charge`, `intensity`, `collision_energies`, `precursor_native_id`,
+`activation`, `analyzer`, and `ccs`. `collision_energies` is a list of
+`{"value", "unit"}` dictionaries, one per energy (stepped energies have
+several), with `unit` `"ev"`, `"nce"` or `None` when the file does not state
+it. `collision_energy` and `ce_is_nce` are gone.
 
 `RunInfo` exposes the source file name, source file format, native ID
 format, instrument term and serial number, parser software name and
 version, acquisition software name and version, start timestamp, mobility
-array kind, analyzers, and `extra`. `Chromatogram` exposes index, ID, CV
+array kind, analyzers, `extra`, `unstated` (the checks the format declares
+it never states: `"unknown_scan_mode"`, `"unknown_collision_energy_unit"`)
+and `warnings` (run-level warnings). `Chromatogram` exposes index, ID, CV
 type, precursor and product m/z, `time_sec`, and `intensity`.
 
 Retention and chromatogram time are in seconds. Ion injection time is in
-milliseconds. Collision energy follows `ce_is_nce`: normalized percent
-when true, electron volts when false. Per-peak mobility follows the run's
+milliseconds. A collision energy's `unit` is `"nce"` (normalized percent) or
+`"ev"` (electron volts). Per-peak mobility follows the run's
 `mobility_array_kind`. `extra` uses namespaced string keys such as
 `opentfraw.scan_segment` and `openszraw.cycle_index`.
 
